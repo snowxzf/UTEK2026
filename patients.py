@@ -631,6 +631,8 @@ def get_patient_database() -> Dict[str, Patient]:
     global _patient_database
     if _patient_database is None:
         _patient_database = PatientDatabase.create_sample_patients()
+    return _patient_database
+
 def get_patient(patient_id: str) -> Optional[Patient]:
     """Get a patient by ID"""
     return get_patient_database().get(patient_id)

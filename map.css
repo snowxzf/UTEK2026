@@ -1,0 +1,197 @@
+/* Drone Tracker Container - Acts as a block in your website */
+#drone-tracker-container {
+    width: 100%;
+    height: 800px; /* Adjust height as needed for your website */
+    display: flex;
+    flex-direction: column;
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin: 20px 0; /* Space around the block */
+}
+
+.tracker-header {
+    padding: 20px;
+    background-color: #1158a0;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tracker-title {
+    margin: 0;
+    font-size: 24px;
+    align-items: center;
+}
+
+.tracker-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.tracker-button {
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.tracker-button:hover {
+    background-color: #2980b9;
+}
+
+.tracker-button.active {
+    background-color: #e74c3c;
+}
+
+/* Content Area */
+.tracker-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 3D Canvas Container */
+.canvas-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#three-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.instruction {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+/* 2D Floor Plan Container */
+.floor-plan-container {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.floor-plan {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.floor-title {
+    margin: 0 0 20px 0;
+    font-size: 20px;
+    color: #2c3e50;
+    text-align: center;
+}
+
+.floor-svg {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.floor-svg text {
+    pointer-events: none;
+}
+
+/* Drone circles in SVG */
+.drone-dot {
+    cursor: pointer;
+    transition: r 0.2s;
+}
+
+.drone-dot:hover {
+    r: 10;
+}
+
+/* Drone Info Panel */
+.drone-info {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    min-width: 250px;
+    z-index: 1000;
+}
+
+.close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    transition: color 0.3s;
+}
+
+.close-button:hover {
+    color: #333;
+}
+
+.drone-info-title {
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    color: #2c3e50;
+}
+
+.drone-info p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #555;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #drone-tracker-container {
+        height: 600px;
+    }
+    
+    .tracker-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .tracker-title {
+        font-size: 20px;
+    }
+    
+    .drone-info {
+        position: absolute;
+        top: 80px;
+        right: 10px;
+        left: 10px;
+        transform: none;
+    }
+}

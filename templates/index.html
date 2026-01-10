@@ -1134,7 +1134,7 @@
 
     <div class="container">
         <div class="header">
-            <h1>🏥 Hospital Drone Logistics System</h1>
+            <h1>Hospital Drone Logistics System</h1>
             <p>Real-Time Energy Savings & Drone Management Dashboard</p>
             <div class="status-bar">
                 <span class="status-indicator" id="connectionStatus">● Connecting...</span>
@@ -1160,49 +1160,11 @@
             </div>
         </div>
 
-        <div class="grid">
-            <!-- Statistics Card -->
-            <div class="card">
-                <h2>📊 System Statistics</h2>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
-                    <strong>🚨 Emergency drones</strong> handle CTAS I & II (Resuscitation & Emergent)<br>
-                    <strong>📦 Normal drones</strong> handle CTAS III, IV & V (Urgent, Less-urgent, Non-urgent)<br>
-                    <small>Using Canadian Triage and Acuity Scale (CTAS) - CMS-ES-02-2017</small>
-                </p>
-                <div class="stat-grid" id="statistics">
-                    <div class="loading">Loading statistics...</div>
-                </div>
-            </div>
-
-            <!-- Energy Savings Card -->
-            <div class="card">
-                <h2>⚡ Energy Savings</h2>
-                <div class="stat-grid" id="energyStats">
-                    <div class="loading">Loading energy data...</div>
-                </div>
-            </div>
-            
-            <!-- Path Efficiency Card -->
-            <div class="card full-width">
-                <h2>🛤️ Path Efficiency Analysis</h2>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
-                    Comparison of RRT-optimized paths (with collision avoidance) vs Dijkstra shortest paths (no collision avoidance).
-                    Shows how much more efficient our path planning algorithm is compared to alternative routing methods.
-                </p>
-                <div style="height: 400px; position: relative;">
-                    <canvas id="pathEfficiencyChart"></canvas>
-                </div>
-                <div id="pathEfficiencyStats" style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
-                    <div class="loading">Loading path efficiency data...</div>
-                </div>
-            </div>
-        </div>
-
         <!-- Map and Request Form Side by Side -->
         <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; align-items: start;">
             <!-- Hospital Map Visualization -->
             <div class="card map-container" style="display: flex; flex-direction: column; height: 100%; min-height: 650px;">
-                <h2>🗺️ Hospital Map & Drone Tracker</h2>
+                <h2>Hospital Map & Drone Tracker</h2>
                 <div id="tracker-controls"></div>
                 <div id="canvas-container" style="display: flex; flex: 1; min-height: 500px; height: 500px; width: 100%; position: relative;">
                     <canvas id="three-canvas" width="800" height="500" style="width: 100%; height: 100%; display: block; background-color: #f0f0f0;"></canvas>
@@ -1224,7 +1186,7 @@
 
             <!-- Create Request Form -->
             <div class="card" style="display: flex; flex-direction: column; overflow-y: auto; height: 650px; min-height: 650px; max-height: 650px;">
-                <h2>📝 Create New Request</h2>
+                <h2> Create New Request</h2>
                 <form id="requestForm" class="request-form">
                     <div class="form-group">
                         <label>Requester ID</label>
@@ -1238,11 +1200,11 @@
                         <label>Requester Location ID <small>(Click a location on the map to select)</small></label>
                         <input type="number" id="requesterLocationId" placeholder="1-8" min="1" max="8" required>
                         <small style="color: #666; display: block; margin-top: 5px;">
-                            💡 Tip: Click any location on the map (left side) to automatically fill this field
+                            Click any location on the map (left side) to automatically fill this field
                         </small>
                     </div>
                     <div class="form-group">
-                        <label>👤 Select Patient <small>(Optional - Auto-fills prioritization data)</small></label>
+                        <label> Select Patient <small>(Optional - Auto-fills prioritization data)</small></label>
                         <select id="patientId" onchange="handlePatientSelection()">
                             <option value="">-- Select a patient (optional) --</option>
                         </select>
@@ -1260,7 +1222,7 @@
                                         <strong style="color: #667eea;">📊 Vitals Over Time</strong>
                                         <label style="display: flex; align-items: center; gap: 5px; font-size: 0.9em; cursor: pointer;">
                                             <input type="checkbox" id="liveVitalsToggle" onchange="toggleLiveVitals()">
-                                            <span>🟢 Live</span>
+                                            <span>Live</span>
                                         </label>
                                         <span id="lastVitalsUpdate" style="font-size: 0.8em; color: #666; display: none;"></span>
                                     </div>
@@ -1297,7 +1259,7 @@
                     
                     <!-- Payload Items Selection -->
                     <div class="form-group">
-                        <label>📦 Select Items to Deliver</label>
+                        <label> Select Items to Deliver</label>
                         <small style="color: #666; display: block; margin-bottom: 10px;">
                             Maximum payload capacity: <strong id="maxPayloadCapacity">1.5</strong> kg (Matternet-style small delivery drone)
                         </small>
@@ -1319,7 +1281,7 @@
                     
                     <!-- Multi-Criteria Prioritization Info (Auto-computed from patient data) -->
                     <div class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #667eea;">
-                        <strong style="color: #667eea;">🎯 Multi-Criteria Prioritization (Auto-computed)</strong>
+                        <strong style="color: #667eea;">Multi-Criteria Prioritization (Auto-computed)</strong>
                         <small style="display: block; color: #666; margin-top: 8px; line-height: 1.6;">
                             When a patient is selected, the algorithm automatically computes all prioritization factors from patient data:<br>
                             • <strong>Age:</strong> From patient date of birth<br>
@@ -1347,7 +1309,7 @@
         <!-- Requests Tabs: Active and Completed -->
         <div class="card full-width">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h2 style="margin: 0;">📋 Requests</h2>
+                <h2 style="margin: 0;">Requests</h2>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.9em; display: none;" id="autoRemoveLabel">
                         <input type="checkbox" id="autoRemoveCompleted" style="cursor: pointer;">
@@ -1359,10 +1321,10 @@
             <!-- Tab Navigation -->
             <div class="tabs-container" style="border-bottom: 2px solid #e0e0e0; margin-bottom: 20px;">
                 <button class="tab-button active" id="activeTab" onclick="switchRequestTab('active')" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid #667eea; color: #667eea; font-size: 1em; font-weight: bold; cursor: pointer; margin-right: 10px;">
-                    🚁 Active Requests
+                    Active Requests
                 </button>
                 <button class="tab-button" id="completedTab" onclick="switchRequestTab('completed')" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid transparent; color: #666; font-size: 1em; font-weight: bold; cursor: pointer;">
-                    ✅ Completed Requests
+                     Completed Requests ✅
                 </button>
             </div>
             
@@ -1378,6 +1340,45 @@
                 <div class="request-list" id="completedRequests" style="max-height: 600px; overflow-y: auto;">
                     <div class="loading">Loading completed requests...</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- System Statistics and Energy Savings -->
+        <div class="grid">
+            <!-- Statistics Card -->
+            <div class="card">
+                <h2>System Statistics</h2>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                    <strong>🚨 Emergency drones</strong> handle CTAS I & II (Resuscitation & Emergent)<br>
+                    <strong> Normal drones</strong> handle CTAS III, IV & V (Urgent, Less-urgent, Non-urgent)<br>
+                    <small>Using Canadian Triage and Acuity Scale (CTAS) - CMS-ES-02-2017</small>
+                </p>
+                <div class="stat-grid" id="statistics">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+
+            <!-- Energy Savings Card -->
+            <div class="card">
+                <h2>Energy Savings</h2>
+                <div class="stat-grid" id="energyStats">
+                    <div class="loading">Loading energy data...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Path Efficiency Analysis -->
+        <div class="card full-width">
+            <h2>Path Efficiency Analysis</h2>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
+                Comparison of RRT-optimized paths (with collision avoidance) vs Dijkstra shortest paths (no collision avoidance).
+                Shows how much more efficient our path planning algorithm is compared to alternative routing methods.
+            </p>
+            <div style="height: 400px; position: relative;">
+                <canvas id="pathEfficiencyChart"></canvas>
+            </div>
+            <div id="pathEfficiencyStats" style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                <div class="loading">Loading path efficiency data...</div>
             </div>
         </div>
     </div>
@@ -2190,7 +2191,7 @@
                     </div>
                     <div class="stat-item" style="border-left: 4px solid #2196F3;">
                         <div class="stat-value" style="color: #2196F3;">${stats.normal_drones || 0}</div>
-                        <div class="stat-label">📦 Normal Drones</div>
+                        <div class="stat-label"> Normal Drones</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-value">${stats.available_drones || 0}</div>
@@ -2295,7 +2296,7 @@
                 if (activeRequests.length === 0) {
                     document.getElementById('activeRequests').innerHTML = `
                         <div class="empty-state">
-                            <div class="empty-state-icon">🚁</div>
+                            <div class="empty-state-icon"></div>
                             <p>No active requests</p>
                             <p style="font-size: 0.9em; margin-top: 10px;">Create a new request to get started!</p>
                         </div>`;
