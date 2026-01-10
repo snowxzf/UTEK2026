@@ -6,6 +6,8 @@ A backend system for managing drone assignments in a hospital environment, imple
 
 This system is designed for the **University of Toronto Engineering Competition (UTEK) 2026 Programming Competition**. It addresses the challenge of efficient medical logistics by managing drone assignments for hospital staff (doctors and nurses) with priority-based queuing and closest-drone assignment.
 
+Demo: https://drive.google.com/file/d/1g4pHR3_r5QDC2kCOILnMMqGwaZwHQfoD/view?usp=sharing
+
 ## Features
 
 - **Priority-Based Request System**: 
