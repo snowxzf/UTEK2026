@@ -1,0 +1,16 @@
+# Python dependencies for Hospital Drone Logistics System
+# Core dependencies (built-in, no installation needed):
+# - heapq
+# - dataclasses
+# - enum
+# - typing
+# - datetime
+# - math
+
+# Optional web API dependencies (uncomment if using Flask API):
+flask==3.0.0
+flask-cors==4.0.0
+
+# Development and testing (optional):
+# pytest==7.4.3
+# pytest-cov==4.1.0

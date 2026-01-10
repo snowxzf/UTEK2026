@@ -1,0 +1,3198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Drone Logistics - Real-Time Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Ensure OrbitControls is available - create fallback immediately if needed
+        // This ensures the map can render even if OrbitControls doesn't load
+        (function() {
+            function setupOrbitControls() {
+                if (typeof THREE === 'undefined') {
+                    console.error('Three.js failed to load!');
+                    return;
+                }
+                
+                // Create fallback OrbitControls immediately if not available
+                if (typeof THREE.OrbitControls === 'undefined' && typeof OrbitControls === 'undefined') {
+                    console.warn('OrbitControls not found - creating fallback (map will work but without camera controls)');
+                    THREE.OrbitControls = function(camera, domElement) {
+                        this.camera = camera;
+                        this.domElement = domElement;
+                        this.update = function() {};
+                        this.enableDamping = false;
+                        this.dampingFactor = 0.05;
+                        this.minDistance = 10;
+                        this.maxDistance = 50;
+                        this.maxPolarAngle = Math.PI / 2;
+                    };
+                } else if (typeof OrbitControls !== 'undefined' && typeof THREE.OrbitControls === 'undefined') {
+                    // OrbitControls loaded as global, attach to THREE
+                    THREE.OrbitControls = OrbitControls;
+                    console.log('OrbitControls attached to THREE');
+                } else {
+                    console.log('OrbitControls loaded successfully');
+                }
+            }
+            
+            // Wait for Three.js to load, then set up OrbitControls
+            if (typeof THREE !== 'undefined') {
+                setupOrbitControls();
+            } else {
+                window.addEventListener('load', function() {
+                    setTimeout(setupOrbitControls, 100);
+                });
+            }
+        })();
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .status-indicator {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status-online {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-offline {
+            background: #f44336;
+            color: white;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 1200px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .energy-stat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .energy-stat .stat-value,
+        .energy-stat .stat-label {
+            color: white;
+        }
+
+        .request-form {
+            display: grid;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .request-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .request-item {
+            padding: 15px;
+            border-left: 4px solid #ddd;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+
+        .request-item:hover {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .request-item.pending {
+            border-left-color: #ff9800;
+        }
+
+        .request-item.assigned {
+            border-left-color: #2196F3;
+        }
+
+        .request-item.completed {
+            border-left-color: #4CAF50;
+        }
+
+        .request-item.cancelled {
+            border-left-color: #f44336;
+        }
+
+        .request-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .request-title {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .priority-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .priority-ctas-i {
+            background: #d32f2f;
+            color: white;
+            font-weight: bold;
+            animation: pulse 1.5s infinite;
+        }
+
+        .priority-ctas-ii {
+            background: #f44336;
+            color: white;
+            font-weight: bold;
+        }
+
+        .priority-ctas-iii {
+            background: #ff9800;
+            color: white;
+        }
+
+        .priority-ctas-iv {
+            background: #2196F3;
+            color: white;
+        }
+
+        .priority-ctas-v {
+            background: #9e9e9e;
+            color: white;
+        }
+
+        /* Backward compatibility for old priority names */
+        .priority-critical, .priority-emergency-critical {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .priority-urgent, .priority-emergency-urgent {
+            background: #f44336;
+            color: white;
+        }
+
+        .priority-high, .priority-normal-high {
+            background: #ff9800;
+            color: white;
+        }
+
+        .priority-low, .priority-normal-low {
+            background: #9e9e9e;
+            color: white;
+        }
+
+        .request-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .energy-details {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        .energy-details h4 {
+            color: #2e7d32;
+            margin-bottom: 8px;
+        }
+
+        .energy-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .energy-item {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .energy-value {
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        /* Tab Styles */
+        .tabs-container {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .tab-button {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: #666;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .tab-button:hover {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+        
+        .tab-button.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .updating {
+            animation: pulse 1s infinite;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: slideDown 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .modal-header h3 {
+            color: #667eea;
+            margin: 0;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .success-message {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+            animation: slideDown 0.3s;
+        }
+
+        .location-info {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .location-info strong {
+            color: #667eea;
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .refresh-indicator.active {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+
+        .badge-emergency {
+            background: #f44336;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .request-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            z-index: 2000;
+            animation: slideInRight 0.3s;
+            min-width: 300px;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .notification.error {
+            background: #f44336;
+            color: white;
+        }
+
+        .notification.info {
+            background: #2196F3;
+            color: white;
+        }
+
+        /* Additional polish */
+        .card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        .request-item {
+            transition: all 0.3s ease;
+        }
+
+        .request-item:hover {
+            transform: translateX(5px);
+            border-left-width: 6px;
+        }
+
+        .stat-item {
+            transition: transform 0.2s;
+        }
+
+        .stat-item:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .request-actions {
+                flex-direction: column;
+            }
+            
+            .btn-small {
+                width: 100%;
+            }
+
+            .modal-content {
+                width: 95%;
+                padding: 20px;
+            }
+        }
+
+        /* Smooth scrolling */
+        .request-list {
+            scroll-behavior: smooth;
+        }
+
+        /* Better focus styles */
+        input:focus, select:focus, textarea:focus {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Collapsible section */
+        .collapsible {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 10px;
+            cursor: pointer;
+            padding: 10px;
+            font-weight: bold;
+            color: #667eea;
+            transition: all 0.3s;
+        }
+
+        .collapsible:hover {
+            background: #e8e8e8;
+        }
+
+        .collapsible::after {
+            content: ' ▶';
+            float: right;
+            transition: transform 0.3s;
+        }
+
+        .collapsible.active::after {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.active {
+            max-height: 2000px;
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #ddd;
+        }
+
+        /* Item selection styles */
+        .item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .item-row:hover {
+            background: #f5f5f5;
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .item-details {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .item-weight {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .item-quantity-input {
+            width: 70px;
+            padding: 6px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+            margin-left: 10px;
+        }
+
+        .item-quantity-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .payload-summary {
+            margin-top: 10px;
+            padding: 12px;
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .payload-summary.exceeds {
+            background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+            border-left-color: #f44336;
+        }
+
+        .payload-summary strong {
+            color: #2e7d32;
+        }
+
+        .payload-summary.exceeds strong {
+            color: #c62828;
+        }
+
+        /* Vitals charts styles */
+        .vitals-charts-container {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .vitals-chart {
+            margin-bottom: 20px;
+            position: relative;
+            height: 250px;
+        }
+
+        .vitals-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .vital-stat {
+            text-align: center;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+
+        .vital-stat.critical {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+
+        .vital-stat.normal {
+            border-left-color: #4CAF50;
+        }
+
+        .vital-stat.warning {
+            border-left-color: #ff9800;
+        }
+
+        .vital-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .vital-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .chart-header {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .vitals-time-selector {
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: white;
+        }
+
+        /* Map/Hospital Visualization Styles */
+        .map-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            min-height: 650px;
+            height: 650px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Side-by-side layout for map and form */
+        @media (min-width: 1200px) {
+            .map-form-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .map-form-grid {
+                grid-template-columns: 1fr !important;
+            }
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 500px;
+            min-height: 500px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: #f5f5f5;
+            position: relative;
+            flex: 1;
+            display: flex !important;
+            visibility: visible !important;
+            overflow: hidden;
+        }
+
+        #three-canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block !important;
+            visibility: visible !important;
+            background-color: #f0f0f0;
+            min-width: 400px;
+            min-height: 300px;
+        }
+
+        #floor-plan-container {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: white;
+            flex: 1;
+        }
+
+        #floor-svg {
+            flex: 1;
+            width: 100%;
+            min-height: 400px;
+        }
+
+        #tracker-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+        }
+
+        .tracker-button {
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .tracker-button:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .tracker-button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        #floor-title {
+            padding: 10px;
+            background: #667eea;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 5px 5px 0 0;
+        }
+
+        #drone-info {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            z-index: 100;
+            min-width: 200px;
+        }
+
+        #drone-info h4 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+
+        #drone-info .info-item {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+
+        #close-drone-info {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #999;
+        }
+
+        #close-drone-info:hover {
+            color: #333;
+        }
+
+        /* Drone dots should not have any hover transforms or animations */
+        /* Hover only changes cursor - drones must remain stationary on hover */
+        .drone-dot:hover {
+            /* Only change cursor - do NOT transform or move the drone */
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <!-- Complete Request Modal -->
+    <div id="completeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>✓ Complete Request</h3>
+                <span class="close" onclick="closeCompleteModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="location-info">
+                    <strong>Request Information:</strong><br>
+                    <span id="modalRequestInfo"></span>
+                </div>
+                <form id="completeForm" class="request-form">
+                    <div class="form-group">
+                        <label>Final Location ID (where drone ends up)</label>
+                        <input type="number" id="finalLocationId" placeholder="1-8" min="1" max="8" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Payload Weight (kg)</label>
+                        <input type="number" id="payloadWeight" placeholder="0.5" step="0.1" min="0" value="0.5" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Traditional Method for Comparison</label>
+                        <select id="traditionalMethod" required>
+                            <option value="vehicle">Vehicle</option>
+                            <option value="electric_cart">Electric Cart</option>
+                            <option value="walking">Walking</option>
+                        </select>
+                    </div>
+                    <div class="success-message" id="completeSuccess"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" onclick="submitCompleteRequest()">Complete Request</button>
+                <button type="button" class="btn" style="background: #999; color: white;" onclick="closeCompleteModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>🏥 Hospital Drone Logistics System</h1>
+            <p>Real-Time Energy Savings & Drone Management Dashboard</p>
+            <div class="status-bar">
+                <span class="status-indicator" id="connectionStatus">● Connecting...</span>
+                <span class="auto-refresh">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autoRefresh" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span>Auto-refresh (5s)</span>
+                    <span class="refresh-indicator">⟳</span>
+                </span>
+            </div>
+            <!-- Overall Carbon & Energy Display -->
+            <div id="overallEnergyDisplay" style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; margin-bottom: 5px;" id="overallEnergySaved">0.0000</div>
+                    <div style="font-size: 0.9em; opacity: 0.9;">Total Energy Saved (kWh)</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; margin-bottom: 5px;" id="overallCarbonSaved">0.0000</div>
+                    <div style="font-size: 0.9em; opacity: 0.9;">Total CO₂ Saved (kg)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- Statistics Card -->
+            <div class="card">
+                <h2>📊 System Statistics</h2>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                    <strong>🚨 Emergency drones</strong> handle CTAS I & II (Resuscitation & Emergent)<br>
+                    <strong>📦 Normal drones</strong> handle CTAS III, IV & V (Urgent, Less-urgent, Non-urgent)<br>
+                    <small>Using Canadian Triage and Acuity Scale (CTAS) - CMS-ES-02-2017</small>
+                </p>
+                <div class="stat-grid" id="statistics">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+
+            <!-- Energy Savings Card -->
+            <div class="card">
+                <h2>⚡ Energy Savings</h2>
+                <div class="stat-grid" id="energyStats">
+                    <div class="loading">Loading energy data...</div>
+                </div>
+            </div>
+            
+            <!-- Path Efficiency Card -->
+            <div class="card full-width">
+                <h2>🛤️ Path Efficiency Analysis</h2>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
+                    Comparison of RRT-optimized paths (with collision avoidance) vs Dijkstra shortest paths (no collision avoidance).
+                    Shows how much more efficient our path planning algorithm is compared to alternative routing methods.
+                </p>
+                <div style="height: 400px; position: relative;">
+                    <canvas id="pathEfficiencyChart"></canvas>
+                </div>
+                <div id="pathEfficiencyStats" style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                    <div class="loading">Loading path efficiency data...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map and Request Form Side by Side -->
+        <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; align-items: start;">
+            <!-- Hospital Map Visualization -->
+            <div class="card map-container" style="display: flex; flex-direction: column; height: 100%; min-height: 650px;">
+                <h2>🗺️ Hospital Map & Drone Tracker</h2>
+                <div id="tracker-controls"></div>
+                <div id="canvas-container" style="display: flex; flex: 1; min-height: 500px; height: 500px; width: 100%; position: relative;">
+                    <canvas id="three-canvas" width="800" height="500" style="width: 100%; height: 100%; display: block; background-color: #f0f0f0;"></canvas>
+                </div>
+                <div id="floor-plan-container" style="display: none; flex-direction: column; flex: 1; min-height: 500px; height: 500px;">
+                    <div id="floor-title">Floor 1 - Main Hospital Floor</div>
+                    <svg id="floor-svg" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" style="flex: 1; min-height: 450px; height: 450px;"></svg>
+                </div>
+                <div id="drone-info">
+                    <span id="close-drone-info">&times;</span>
+                    <h4>Drone Information</h4>
+                    <div class="info-item"><strong>Name:</strong> <span id="drone-name"></span></div>
+                    <div class="info-item"><strong>ID:</strong> <span id="drone-id"></span></div>
+                    <div class="info-item"><strong>Floor:</strong> <span id="drone-floor"></span></div>
+                    <div class="info-item"><strong>Status:</strong> <span id="drone-status"></span></div>
+                    <div class="info-item"><strong>Position:</strong> <span id="drone-position"></span></div>
+                </div>
+            </div>
+
+            <!-- Create Request Form -->
+            <div class="card" style="display: flex; flex-direction: column; overflow-y: auto; height: 650px; min-height: 650px; max-height: 650px;">
+                <h2>📝 Create New Request</h2>
+                <form id="requestForm" class="request-form">
+                    <div class="form-group">
+                        <label>Requester ID</label>
+                        <input type="text" id="requesterId" placeholder="e.g., DR001, NU001" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Requester Name</label>
+                        <input type="text" id="requesterName" placeholder="e.g., Dr. Smith" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Requester Location ID <small>(Click a location on the map to select)</small></label>
+                        <input type="number" id="requesterLocationId" placeholder="1-8" min="1" max="8" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">
+                            💡 Tip: Click any location on the map (left side) to automatically fill this field
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label>👤 Select Patient <small>(Optional - Auto-fills prioritization data)</small></label>
+                        <select id="patientId" onchange="handlePatientSelection()">
+                            <option value="">-- Select a patient (optional) --</option>
+                        </select>
+                        <small style="color: #666; margin-top: 5px; display: block;">
+                            Selecting a patient will automatically compute all prioritization factors from patient data.
+                            The algorithm calculates age, clinical severity, life years gained, quality of life, and other factors automatically.
+                            <br><strong>Reference:</strong> Dery et al. (2020) - A systematic review of patient prioritization tools
+                        </small>
+                        <div id="patientInfo" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-radius: 5px; border-left: 4px solid #667eea; display: none;">
+                            <strong>Patient Details & Vitals Overview:</strong>
+                            <div id="patientDetails"></div>
+                            <div id="vitalsChartsContainer" class="vitals-charts-container" style="display: none;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <strong style="color: #667eea;">📊 Vitals Over Time</strong>
+                                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.9em; cursor: pointer;">
+                                            <input type="checkbox" id="liveVitalsToggle" onchange="toggleLiveVitals()">
+                                            <span>🟢 Live</span>
+                                        </label>
+                                        <span id="lastVitalsUpdate" style="font-size: 0.8em; color: #666; display: none;"></span>
+                                    </div>
+                                    <select id="vitalsTimeRange" class="vitals-time-selector" onchange="updateVitalsCharts()">
+                                        <option value="6">Last 6 hours</option>
+                                        <option value="12" selected>Last 12 hours</option>
+                                        <option value="24">Last 24 hours</option>
+                                    </select>
+                                </div>
+                                <div id="vitalsCharts"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>CTAS Priority Level <small>(Canadian Triage and Acuity Scale)</small></label>
+                        <select id="priority" required>
+                            <option value="ctas_i">CTAS I - Resuscitation (Immediate - 98% seen immediately)</option>
+                            <option value="ctas_ii">CTAS II - Emergent (Within 15 min - 95% within 15 min)</option>
+                            <option value="ctas_iii">CTAS III - Urgent (Within 30 min - 90% within 30 min)</option>
+                            <option value="ctas_iv" selected>CTAS IV - Less-urgent (Within 60 min - 85% within 60 min)</option>
+                            <option value="ctas_v">CTAS V - Non-urgent (Within 120 min - 80% within 120 min)</option>
+                        </select>
+                        <small style="color: #666; margin-top: 5px; display: block;">
+                            <strong>CTAS I & II</strong>: Cardiac arrest, major trauma, shock, head injury, chest pain, internal bleeding<br>
+                            <strong>CTAS III</strong>: Mild-moderate asthma, moderate trauma, vomiting/diarrhea in &lt;2 years<br>
+                            <strong>CTAS IV</strong>: Urinary symptoms, mild abdominal pain, earache<br>
+                            <strong>CTAS V</strong>: Sore throat, chronic problems, non-urgent psychiatric
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label>Description <small>(Optional)</small></label>
+                        <textarea id="description" rows="3" placeholder="Describe the request (optional)..."></textarea>
+                    </div>
+                    
+                    <!-- Payload Items Selection -->
+                    <div class="form-group">
+                        <label>📦 Select Items to Deliver</label>
+                        <small style="color: #666; display: block; margin-bottom: 10px;">
+                            Maximum payload capacity: <strong id="maxPayloadCapacity">1.5</strong> kg (Matternet-style small delivery drone)
+                        </small>
+                        <div id="itemsContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                            <div class="loading">Loading items...</div>
+                        </div>
+                        <div id="payloadSummary" class="payload-summary" style="display: none;">
+                            <strong>Total Weight: <span id="totalWeight">0.00</span> kg / <span id="maxCapacity">1.5</span> kg</strong>
+                            <span id="capacityStatus" style="margin-left: 10px; display: block; margin-top: 5px;"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="emergency"> Force Emergency Flag (override CTAS classification)
+                        </label>
+                        <small style="color: #666; display: block; margin-top: 5px;">Check this to manually mark as emergency even if CTAS level is III-V</small>
+                    </div>
+                    
+                    <!-- Multi-Criteria Prioritization Info (Auto-computed from patient data) -->
+                    <div class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #667eea;">
+                        <strong style="color: #667eea;">🎯 Multi-Criteria Prioritization (Auto-computed)</strong>
+                        <small style="display: block; color: #666; margin-top: 8px; line-height: 1.6;">
+                            When a patient is selected, the algorithm automatically computes all prioritization factors from patient data:<br>
+                            • <strong>Age:</strong> From patient date of birth<br>
+                            • <strong>Clinical Severity:</strong> Computed from patient risk score and vitals<br>
+                            • <strong>Parental Status:</strong> Estimated from age (20-60 years)<br>
+                            • <strong>Life Years Gained:</strong> Estimated based on patient age and condition<br>
+                            • <strong>Quality of Life:</strong> Estimated from patient status (improving/stable/monitoring/critical)<br>
+                            • <strong>Lifestyle Responsibility:</strong> Inferred from lifestyle risks in patient data<br>
+                            • <strong>Social Role:</strong> Defaults to general (can be enhanced with patient metadata)<br><br>
+                            These factors are used to break ties when multiple requests have the same CTAS level.
+                            <br><strong>Reference:</strong> Dery et al. (2020) - Patient prioritization tools, Pinho & Leal (2025) - Vital Priority System
+                        </small>
+                        <div id="computedPrioritization" style="margin-top: 10px; padding: 10px; background: white; border-radius: 5px; display: none;">
+                            <strong>Computed Values (for selected patient):</strong>
+                            <div id="prioritizationValues" style="margin-top: 8px; font-size: 0.9em; color: #333;"></div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Create Request</button>
+                </form>
+                <div id="formMessage"></div>
+            </div>
+        </div>
+
+        <!-- Requests Tabs: Active and Completed -->
+        <div class="card full-width">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="margin: 0;">📋 Requests</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.9em; display: none;" id="autoRemoveLabel">
+                        <input type="checkbox" id="autoRemoveCompleted" style="cursor: pointer;">
+                        <span>Auto-remove after 30 minutes</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <div class="tabs-container" style="border-bottom: 2px solid #e0e0e0; margin-bottom: 20px;">
+                <button class="tab-button active" id="activeTab" onclick="switchRequestTab('active')" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid #667eea; color: #667eea; font-size: 1em; font-weight: bold; cursor: pointer; margin-right: 10px;">
+                    🚁 Active Requests
+                </button>
+                <button class="tab-button" id="completedTab" onclick="switchRequestTab('completed')" style="padding: 12px 24px; background: none; border: none; border-bottom: 3px solid transparent; color: #666; font-size: 1em; font-weight: bold; cursor: pointer;">
+                    ✅ Completed Requests
+                </button>
+            </div>
+            
+            <!-- Tab Content: Active Requests -->
+            <div class="tab-content active" id="activeRequestsTab" style="display: block;">
+                <div class="request-list" id="activeRequests" style="max-height: 600px; overflow-y: auto;">
+                    <div class="loading">Loading requests...</div>
+                </div>
+            </div>
+            
+            <!-- Tab Content: Completed Requests -->
+            <div class="tab-content" id="completedRequestsTab" style="display: none;">
+                <div class="request-list" id="completedRequests" style="max-height: 600px; overflow-y: auto;">
+                    <div class="loading">Loading completed requests...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5001/api';
+        let autoRefreshInterval = null;
+        let isInitialized = false;
+        let currentCompletingRequestId = null;
+        let isUpdating = false;
+
+        // Notification system
+        function showNotification(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            container.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'slideInRight 0.3s reverse';
+                setTimeout(() => notification.remove(), 300);
+            }, duration);
+        }
+
+        // Format CTAS priority for display
+        function formatCTASPriority(priorityStr) {
+            const ctasMap = {
+                'ctas_i': 'CTAS I - Resuscitation',
+                'ctas_ii': 'CTAS II - Emergent',
+                'ctas_iii': 'CTAS III - Urgent',
+                'ctas_iv': 'CTAS IV - Less-urgent',
+                'ctas_v': 'CTAS V - Non-urgent',
+                // Backward compatibility
+                'emergency_critical': 'CTAS I - Resuscitation',
+                'emergency_urgent': 'CTAS II - Emergent',
+                'normal_high': 'CTAS III - Urgent',
+                'normal_low': 'CTAS IV - Less-urgent'
+            };
+            return ctasMap[priorityStr.toLowerCase()] || priorityStr.replace('_', ' ').toUpperCase();
+        }
+
+        // Toggle collapsible section
+        function toggleCollapsible(element) {
+            element.classList.toggle('active');
+            const content = element.nextElementSibling;
+            content.classList.toggle('active');
+        }
+
+        // Item catalog and payload management
+        let itemCatalog = null;
+        let maxPayloadCapacity = 1.5;
+        let patientCatalog = [];
+        let currentPatientVitalsData = null;
+        let vitalsCharts = {}; // Store chart instances
+        let vitalsPollInterval = null; // Interval for live vitals updates
+        let isLiveVitalsEnabled = false; // Track if live updates are enabled
+        let autoRemoveCompletedEnabled = false; // Track if auto-remove completed requests after 30 mins is enabled
+        let currentRequestTab = 'active'; // Track which request tab is active
+        
+        // Tab switching function for requests
+        function switchRequestTab(tab) {
+            const activeTabEl = document.getElementById('activeTab');
+            const completedTabEl = document.getElementById('completedTab');
+            
+            // Update tab buttons - remove active class and reset inline styles
+            activeTabEl.classList.remove('active');
+            activeTabEl.style.borderBottom = '3px solid transparent';
+            activeTabEl.style.color = '#666';
+            
+            completedTabEl.classList.remove('active');
+            completedTabEl.style.borderBottom = '3px solid transparent';
+            completedTabEl.style.color = '#666';
+            
+            // Hide all tab contents
+            document.getElementById('activeRequestsTab').classList.remove('active');
+            document.getElementById('activeRequestsTab').style.display = 'none';
+            document.getElementById('completedRequestsTab').classList.remove('active');
+            document.getElementById('completedRequestsTab').style.display = 'none';
+            
+            // Show selected tab with active styling
+            if (tab === 'active') {
+                activeTabEl.classList.add('active');
+                activeTabEl.style.borderBottom = '3px solid #667eea';
+                activeTabEl.style.color = '#667eea';
+                
+                document.getElementById('activeRequestsTab').classList.add('active');
+                document.getElementById('activeRequestsTab').style.display = 'block';
+                document.getElementById('autoRemoveLabel').style.display = 'none';
+            } else if (tab === 'completed') {
+                completedTabEl.classList.add('active');
+                completedTabEl.style.borderBottom = '3px solid #667eea';
+                completedTabEl.style.color = '#667eea';
+                
+                document.getElementById('completedRequestsTab').classList.add('active');
+                document.getElementById('completedRequestsTab').style.display = 'block';
+                document.getElementById('autoRemoveLabel').style.display = 'flex';
+            }
+            
+            currentRequestTab = tab;
+        }
+
+        async function loadItemCatalog() {
+            try {
+                const response = await fetch(`${API_BASE}/items`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                itemCatalog = data.categories;
+                maxPayloadCapacity = data.max_payload_capacity_kg;
+                document.getElementById('maxPayloadCapacity').textContent = maxPayloadCapacity.toFixed(1);
+                renderItems();
+            } catch (error) {
+                console.error('Error loading item catalog:', error);
+                document.getElementById('itemsContainer').innerHTML = '<div class="error">Error loading items. Please refresh.</div>';
+            }
+        }
+
+        // Patient database management
+        async function loadPatients() {
+            try {
+                const response = await fetch(`${API_BASE}/patients`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                patientCatalog = data.patients || [];
+                renderPatients();
+            } catch (error) {
+                console.error('Error loading patients:', error);
+                document.getElementById('patientId').innerHTML = '<option value="">Error loading patients</option>';
+            }
+        }
+
+        function renderPatients() {
+            const select = document.getElementById('patientId');
+            select.innerHTML = '<option value="">-- Select a patient (optional) --</option>';
+            
+            patientCatalog.forEach(patient => {
+                const option = document.createElement('option');
+                option.value = patient.patient_id;
+                const statusEmoji = patient.is_critical_vitals ? '🚨' : patient.current_status === 'critical' ? '⚠️' : '👤';
+                const ageText = patient.age ? `, Age ${patient.age}` : '';
+                option.textContent = `${statusEmoji} ${patient.patient_id} - ${patient.name}${ageText} (${patient.current_status})`;
+                select.appendChild(option);
+            });
+        }
+
+        async function handlePatientSelection() {
+            const patientId = document.getElementById('patientId').value;
+            const patientInfoDiv = document.getElementById('patientInfo');
+            const patientDetailsDiv = document.getElementById('patientDetails');
+            
+            if (!patientId) {
+                patientInfoDiv.style.display = 'none';
+                document.getElementById('vitalsChartsContainer').style.display = 'none';
+                document.getElementById('computedPrioritization').style.display = 'none';
+                // Stop live updates
+                if (vitalsPollInterval) {
+                    clearInterval(vitalsPollInterval);
+                    vitalsPollInterval = null;
+                }
+                isLiveVitalsEnabled = false;
+                const toggle = document.getElementById('liveVitalsToggle');
+                if (toggle) toggle.checked = false;
+                // Destroy charts if they exist
+                destroyVitalsCharts();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/patient/${patientId}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const patient = await response.json();
+                
+                // Display patient information
+                let vitalsText = 'Not available';
+                if (patient.current_vitals) {
+                    const v = patient.current_vitals;
+                    vitalsText = `HR: ${v.heart_rate || 'N/A'} bpm, BP: ${v.blood_pressure_systolic || 'N/A'}/${v.blood_pressure_diastolic || 'N/A'} mmHg, Temp: ${v.temperature || 'N/A'}°C, O₂: ${v.oxygen_saturation || 'N/A'}%`;
+                }
+                
+                // Build vitals overview cards
+                const vitalsOverview = buildVitalsOverview(patient);
+                
+                patientDetailsDiv.innerHTML = `
+                    <div style="margin-top: 10px;">
+                        <strong>Name:</strong> ${patient.name}<br>
+                        <strong>Age:</strong> ${patient.age || 'N/A'}<br>
+                        <strong>Gender:</strong> ${patient.gender || 'N/A'}<br>
+                        <strong>Status:</strong> <span style="font-weight: bold; color: ${getStatusColor(patient.current_status)}">${patient.current_status}</span><br>
+                        <strong>Symptoms:</strong> ${patient.symptoms || 'N/A'}<br>
+                        <strong>Risk Score:</strong> ${patient.risk_score ? patient.risk_score.toFixed(2) : 'N/A'}<br>
+                        <strong>Days in Hospital:</strong> ${patient.days_in_hospital || 'N/A'}<br>
+                        <strong>Health Risks:</strong> ${patient.health_risks?.join(', ') || 'None'}<br>
+                        <strong>Reason:</strong> ${patient.reason_for_hospitalization || 'N/A'}<br>
+                        <div class="vitals-overview" style="margin-top: 15px;">
+                            ${vitalsOverview}
+                        </div>
+                    </div>
+                `;
+                patientInfoDiv.style.display = 'block';
+                
+                // Load vitals history and display charts
+                await loadVitalsCharts(patientId);
+                
+                // Show computed prioritization values
+                showComputedPrioritization(patient);
+            } catch (error) {
+                console.error('Error loading patient:', error);
+                patientInfoDiv.style.display = 'none';
+                showNotification(`Error loading patient: ${error.message}`, 'error');
+            }
+        }
+
+        function showComputedPrioritization(patient) {
+            // Compute prioritization values (same logic as backend)
+            let age = patient.age || 'N/A';
+            let clinicalSeverity = patient.risk_score !== undefined ? patient.risk_score.toFixed(2) : 'N/A';
+            let isParent = patient.age && 20 <= patient.age && patient.age <= 60 ? 'Yes' : 'No';
+            
+            // Expected life years gained (estimate)
+            let lifeYearsGained = 'N/A';
+            if (patient.age) {
+                if (patient.age < 25) {
+                    lifeYearsGained = Math.max(0, 65 - patient.age).toFixed(1);
+                } else if (patient.age < 65) {
+                    lifeYearsGained = Math.max(0, 75 - patient.age).toFixed(1);
+                } else {
+                    lifeYearsGained = Math.max(0, 85 - patient.age).toFixed(1);
+                }
+            }
+            
+            // Quality of life improvement (estimate from status)
+            let qolScore = 'N/A';
+            const statusQOL = {
+                'improving': 0.8,
+                'stable': 0.6,
+                'monitoring': 0.4,
+                'deteriorating': 0.2,
+                'critical': 0.1
+            };
+            if (patient.current_status) {
+                const baseQOL = statusQOL[patient.current_status.toLowerCase()] || 0.5;
+                if (patient.age) {
+                    const ageFactor = Math.max(0.5, 1.0 - (patient.age / 100.0));
+                    qolScore = (baseQOL * ageFactor).toFixed(2);
+                } else {
+                    qolScore = baseQOL.toFixed(2);
+                }
+            }
+            
+            // Lifestyle responsibility
+            let lifestyle = 'N/A';
+            const lifestyleRisks = patient.lifestyle_risks?.length || 0;
+            if (lifestyleRisks === 0) {
+                lifestyle = 'Responsible';
+            } else if (lifestyleRisks <= 1) {
+                lifestyle = 'Moderate';
+            } else {
+                lifestyle = 'Irresponsible';
+            }
+            
+            // Social role (default to general for now)
+            let socialRole = 'General';
+            
+            // Display computed values
+            const prioritizationDiv = document.getElementById('prioritizationValues');
+            prioritizationDiv.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                    <div><strong>Age:</strong> ${age}</div>
+                    <div><strong>Is Parent:</strong> ${isParent}</div>
+                    <div><strong>Clinical Severity:</strong> ${clinicalSeverity}</div>
+                    <div><strong>Life Years Gained:</strong> ${lifeYearsGained}</div>
+                    <div><strong>Quality of Life:</strong> ${qolScore}</div>
+                    <div><strong>Lifestyle:</strong> ${lifestyle}</div>
+                    <div><strong>Social Role:</strong> ${socialRole}</div>
+                </div>
+            `;
+            document.getElementById('computedPrioritization').style.display = 'block';
+            
+            // Suggest CTAS priority if patient has critical vitals
+            if (patient.is_critical_vitals || patient.current_status === 'critical') {
+                const prioritySelect = document.getElementById('priority');
+                if (prioritySelect.value === 'ctas_iv' || prioritySelect.value === 'ctas_v') {
+                    // Suggest emergency priority, but don't force
+                    showNotification('⚠️ Patient has critical vitals. Consider selecting CTAS I or II.', 'info', 5000);
+                }
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'critical': '#f44336',
+                'deteriorating': '#ff9800',
+                'monitoring': '#2196F3',
+                'improving': '#4CAF50',
+                'stable': '#4CAF50'
+            };
+            return colors[status] || '#666';
+        }
+
+        function buildVitalsOverview(patient) {
+            if (!patient.current_vitals) return '';
+            
+            const v = patient.current_vitals;
+            const vitals = [
+                { label: 'Heart Rate', value: v.heart_rate, unit: 'bpm', critical: !v.heart_rate || v.heart_rate < 50 || v.heart_rate > 120, normal: v.heart_rate >= 60 && v.heart_rate <= 100 },
+                { label: 'BP', value: `${v.blood_pressure_systolic || 'N/A'}/${v.blood_pressure_diastolic || 'N/A'}`, unit: 'mmHg', critical: v.blood_pressure_systolic && (v.blood_pressure_systolic < 90 || v.blood_pressure_systolic > 180), normal: v.blood_pressure_systolic >= 90 && v.blood_pressure_systolic <= 140 },
+                { label: 'Temperature', value: v.temperature, unit: '°C', critical: v.temperature && (v.temperature < 35 || v.temperature > 39), normal: v.temperature >= 36.5 && v.temperature <= 37.5 },
+                { label: 'O₂ Sat', value: v.oxygen_saturation, unit: '%', critical: v.oxygen_saturation && v.oxygen_saturation < 92, normal: v.oxygen_saturation >= 95 },
+                { label: 'Resp Rate', value: v.respiratory_rate, unit: '/min', critical: v.respiratory_rate && (v.respiratory_rate < 10 || v.respiratory_rate > 30), normal: v.respiratory_rate >= 12 && v.respiratory_rate <= 20 },
+                { label: 'Pain', value: v.pain_level, unit: '/10', critical: v.pain_level && v.pain_level >= 8, normal: v.pain_level <= 3 }
+            ];
+
+            return vitals.map(vital => {
+                const statusClass = vital.critical ? 'critical' : (vital.normal ? 'normal' : 'warning');
+                const displayValue = vital.value !== null && vital.value !== undefined ? vital.value : 'N/A';
+                return `
+                    <div class="vital-stat ${statusClass}">
+                        <div class="vital-label">${vital.label}</div>
+                        <div class="vital-value">${displayValue} ${vital.unit}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadVitalsCharts(patientId, isLiveUpdate = false) {
+            try {
+                const hoursBack = parseInt(document.getElementById('vitalsTimeRange')?.value || 24);
+                const live = isLiveUpdate || isLiveVitalsEnabled ? 'true' : 'false';
+                const response = await fetch(`${API_BASE}/patient/${patientId}/vitals?hours=${hoursBack}&live=${live}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const data = await response.json();
+                currentPatientVitalsData = data;
+                
+                // Update last update timestamp
+                if (data.last_update) {
+                    const updateEl = document.getElementById('lastVitalsUpdate');
+                    if (updateEl) {
+                        const updateTime = new Date(data.last_update);
+                        updateEl.textContent = `Updated: ${updateTime.toLocaleTimeString()}`;
+                        updateEl.style.display = 'inline';
+                    }
+                }
+                
+                if (data.vitals && data.vitals.length > 0) {
+                    document.getElementById('vitalsChartsContainer').style.display = 'block';
+                    if (isLiveUpdate && vitalsCharts.hrRR) {
+                        // Update existing charts with new data
+                        updateVitalsChartsData(data.vitals);
+                    } else {
+                        // Render charts from scratch
+                        renderVitalsCharts(data.vitals);
+                    }
+                } else {
+                    document.getElementById('vitalsChartsContainer').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading vitals:', error);
+                if (!isLiveUpdate) {
+                    document.getElementById('vitalsChartsContainer').style.display = 'none';
+                }
+            }
+        }
+        
+        function toggleLiveVitals() {
+            const toggle = document.getElementById('liveVitalsToggle');
+            isLiveVitalsEnabled = toggle.checked;
+            const patientId = document.getElementById('patientId').value;
+            
+            if (isLiveVitalsEnabled && patientId) {
+                // Start polling every 2 minutes (120 seconds)
+                vitalsPollInterval = setInterval(() => {
+                    if (patientId) {
+                        loadVitalsCharts(patientId, true);
+                    }
+                }, 120000); // 2 minutes = 120000ms
+                
+                // Also update immediately
+                loadVitalsCharts(patientId, true);
+            } else {
+                // Stop polling
+                if (vitalsPollInterval) {
+                    clearInterval(vitalsPollInterval);
+                    vitalsPollInterval = null;
+                }
+            }
+        }
+        
+        function updateVitalsChartsData(newVitalsData) {
+            // Update existing charts with new data points
+            if (!newVitalsData || newVitalsData.length === 0) return;
+            
+            const sortedData = [...newVitalsData].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            const labels = sortedData.map(v => {
+                const date = new Date(v.timestamp);
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            });
+            
+            // Update each chart
+            if (vitalsCharts.hrRR) {
+                vitalsCharts.hrRR.data.labels = labels;
+                vitalsCharts.hrRR.data.datasets[0].data = sortedData.map(v => v.heart_rate);
+                vitalsCharts.hrRR.data.datasets[1].data = sortedData.map(v => v.respiratory_rate);
+                vitalsCharts.hrRR.update('none'); // Update without animation for smoother live updates
+            }
+            
+            if (vitalsCharts.bp) {
+                vitalsCharts.bp.data.labels = labels;
+                vitalsCharts.bp.data.datasets[0].data = sortedData.map(v => v.blood_pressure_systolic);
+                vitalsCharts.bp.data.datasets[1].data = sortedData.map(v => v.blood_pressure_diastolic);
+                vitalsCharts.bp.update('none');
+            }
+            
+            if (vitalsCharts.tempO2) {
+                vitalsCharts.tempO2.data.labels = labels;
+                vitalsCharts.tempO2.data.datasets[0].data = sortedData.map(v => v.temperature);
+                vitalsCharts.tempO2.data.datasets[1].data = sortedData.map(v => v.oxygen_saturation);
+                vitalsCharts.tempO2.update('none');
+            }
+            
+            if (vitalsCharts.pain) {
+                vitalsCharts.pain.data.labels = labels;
+                vitalsCharts.pain.data.datasets[0].data = sortedData.map(v => v.pain_level);
+                vitalsCharts.pain.update('none');
+            }
+        }
+
+        function updateVitalsCharts() {
+            const patientId = document.getElementById('patientId').value;
+            if (patientId) {
+                loadVitalsCharts(patientId);
+            }
+        }
+
+        function destroyVitalsCharts() {
+            // Destroy all existing charts
+            Object.values(vitalsCharts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            vitalsCharts = {};
+        }
+
+        function renderVitalsCharts(vitalsData) {
+            // Destroy existing charts
+            destroyVitalsCharts();
+            
+            // Sort by timestamp (oldest first)
+            const sortedData = [...vitalsData].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            // Extract data
+            const labels = sortedData.map(v => {
+                const date = new Date(v.timestamp);
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            });
+            
+            const chartsContainer = document.getElementById('vitalsCharts');
+            chartsContainer.innerHTML = '';
+            
+            // Chart 1: Heart Rate and Respiratory Rate
+            const hrRRChartContainer = document.createElement('div');
+            hrRRChartContainer.className = 'vitals-chart';
+            hrRRChartContainer.innerHTML = '<div class="chart-header">Heart Rate & Respiratory Rate</div><canvas id="hrRRChart"></canvas>';
+            chartsContainer.appendChild(hrRRChartContainer);
+            
+            const hrRRCtx = document.getElementById('hrRRChart').getContext('2d');
+            vitalsCharts.hrRR = new Chart(hrRRCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Heart Rate (bpm)',
+                            data: sortedData.map(v => v.heart_rate),
+                            borderColor: '#f44336',
+                            backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Respiratory Rate (/min)',
+                            data: sortedData.map(v => v.respiratory_rate),
+                            borderColor: '#2196F3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'Heart Rate (bpm)' },
+                            position: 'left'
+                        },
+                        y1: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'Respiratory Rate (/min)' },
+                            position: 'right',
+                            grid: { drawOnChartArea: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+            
+            // Chart 2: Blood Pressure
+            const bpChartContainer = document.createElement('div');
+            bpChartContainer.className = 'vitals-chart';
+            bpChartContainer.innerHTML = '<div class="chart-header">Blood Pressure</div><canvas id="bpChart"></canvas>';
+            chartsContainer.appendChild(bpChartContainer);
+            
+            const bpCtx = document.getElementById('bpChart').getContext('2d');
+            vitalsCharts.bp = new Chart(bpCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Systolic (mmHg)',
+                            data: sortedData.map(v => v.blood_pressure_systolic),
+                            borderColor: '#9C27B0',
+                            backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Diastolic (mmHg)',
+                            data: sortedData.map(v => v.blood_pressure_diastolic),
+                            borderColor: '#E91E63',
+                            backgroundColor: 'rgba(233, 30, 99, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'mmHg' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+            
+            // Chart 3: Temperature and Oxygen Saturation
+            const tempO2ChartContainer = document.createElement('div');
+            tempO2ChartContainer.className = 'vitals-chart';
+            tempO2ChartContainer.innerHTML = '<div class="chart-header">Temperature & Oxygen Saturation</div><canvas id="tempO2Chart"></canvas>';
+            chartsContainer.appendChild(tempO2ChartContainer);
+            
+            const tempO2Ctx = document.getElementById('tempO2Chart').getContext('2d');
+            vitalsCharts.tempO2 = new Chart(tempO2Ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Temperature (°C)',
+                            data: sortedData.map(v => v.temperature),
+                            borderColor: '#FF9800',
+                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'O₂ Saturation (%)',
+                            data: sortedData.map(v => v.oxygen_saturation),
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: { display: true, text: 'Temperature (°C)' },
+                            position: 'left'
+                        },
+                        y1: {
+                            beginAtZero: false,
+                            min: 85,
+                            max: 100,
+                            title: { display: true, text: 'O₂ Saturation (%)' },
+                            position: 'right',
+                            grid: { drawOnChartArea: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+            
+            // Chart 4: Pain Level
+            const painChartContainer = document.createElement('div');
+            painChartContainer.className = 'vitals-chart';
+            painChartContainer.innerHTML = '<div class="chart-header">Pain Level</div><canvas id="painChart"></canvas>';
+            chartsContainer.appendChild(painChartContainer);
+            
+            const painCtx = document.getElementById('painChart').getContext('2d');
+            vitalsCharts.pain = new Chart(painCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Pain Level (0-10)',
+                        data: sortedData.map(v => v.pain_level),
+                        borderColor: '#F44336',
+                        backgroundColor: 'rgba(244, 67, 54, 0.2)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 10,
+                            title: { display: true, text: 'Pain Level' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+        }
+
+        function renderItems() {
+            if (!itemCatalog) return;
+
+            const container = document.getElementById('itemsContainer');
+            let html = '';
+
+            for (const [category, items] of Object.entries(itemCatalog)) {
+                const categoryName = category.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+                html += `<div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee;">
+                    <strong style="color: #667eea; display: block; margin-bottom: 8px;">${categoryName}</strong>`;
+                
+                items.forEach(item => {
+                    html += `
+                        <div class="item-row">
+                            <div class="item-info">
+                                <div class="item-name">${item.name}</div>
+                                <div class="item-details">${item.description} | <span class="item-weight">${item.weight_kg} kg each</span></div>
+                            </div>
+                            <input type="number" 
+                                   id="item_${item.id}" 
+                                   class="item-quantity-input"
+                                   min="0" 
+                                   value="0" 
+                                   onchange="updatePayloadSummary()"
+                                   placeholder="0">
+                        </div>`;
+                });
+                
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function getSelectedItems() {
+            const selected = {};
+            if (!itemCatalog) return selected;
+
+            for (const items of Object.values(itemCatalog)) {
+                items.forEach(item => {
+                    const input = document.getElementById(`item_${item.id}`);
+                    if (input && parseInt(input.value) > 0) {
+                        selected[item.id] = parseInt(input.value);
+                    }
+                });
+            }
+            return selected;
+        }
+
+        function calculateTotalWeight() {
+            const selected = getSelectedItems();
+            let total = 0;
+            
+            for (const items of Object.values(itemCatalog || {})) {
+                items.forEach(item => {
+                    const quantity = selected[item.id] || 0;
+                    total += item.weight_kg * quantity;
+                });
+            }
+            
+            return total;
+        }
+
+        function updatePayloadSummary() {
+            const totalWeight = calculateTotalWeight();
+            const summary = document.getElementById('payloadSummary');
+            const totalWeightEl = document.getElementById('totalWeight');
+            const capacityStatusEl = document.getElementById('capacityStatus');
+            const maxCapacityEl = document.getElementById('maxCapacity');
+
+            if (totalWeight > 0) {
+                summary.style.display = 'block';
+                totalWeightEl.textContent = totalWeight.toFixed(3);
+                maxCapacityEl.textContent = maxPayloadCapacity.toFixed(1);
+                
+                if (totalWeight > maxPayloadCapacity) {
+                    summary.classList.add('exceeds');
+                    totalWeightEl.style.color = '#c62828';
+                    capacityStatusEl.innerHTML = `<span style="color: #c62828; font-weight: bold;">⚠️ EXCEEDS CAPACITY by ${(totalWeight - maxPayloadCapacity).toFixed(3)} kg! Please reduce quantities.</span>`;
+                } else {
+                    summary.classList.remove('exceeds');
+                    totalWeightEl.style.color = '#2e7d32';
+                    const remaining = (maxPayloadCapacity - totalWeight).toFixed(3);
+                    capacityStatusEl.innerHTML = `<span style="color: #2e7d32;">✓ ${remaining} kg capacity remaining</span>`;
+                }
+            } else {
+                summary.style.display = 'none';
+                summary.classList.remove('exceeds');
+            }
+        }
+
+        // Initialize connection
+        async function initializeSystem() {
+            try {
+                const response = await fetch(`${API_BASE}/initialize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                if (data.status === 'initialized') {
+                    isInitialized = true;
+                    updateConnectionStatus(true);
+                    updateDashboard();
+                    showNotification('System initialized successfully!', 'success');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateConnectionStatus(false);
+                showNotification('Failed to initialize system. Please check if the server is running.', 'error', 5000);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connectionStatus');
+            if (connected) {
+                statusEl.textContent = '● Online';
+                statusEl.className = 'status-indicator status-online';
+            } else {
+                statusEl.textContent = '● Offline';
+                statusEl.className = 'status-indicator status-offline';
+            }
+        }
+
+        async function updateDashboard() {
+            if (!isInitialized || isUpdating) return;
+            isUpdating = true;
+
+            try {
+                const indicator = document.querySelector('.refresh-indicator');
+                if (indicator) indicator.classList.add('active');
+
+                await Promise.all([
+                    updateStatistics(),
+                    updateEnergyStats(),
+                    updateActiveRequests(),
+                    updateCompletedRequests(),
+                    updatePathEfficiencyChart()
+                ]);
+
+                const indicator2 = document.querySelector('.refresh-indicator');
+                if (indicator2) indicator2.classList.remove('active');
+            } catch (error) {
+                console.error('Dashboard update error:', error);
+                updateConnectionStatus(false);
+            } finally {
+                isUpdating = false;
+            }
+        }
+
+        async function updateStatistics() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const stats = await response.json();
+
+                const statsHtml = `
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.total_drones || 0}</div>
+                        <div class="stat-label">Total Drones</div>
+                    </div>
+                    <div class="stat-item" style="border-left: 4px solid #f44336;">
+                        <div class="stat-value" style="color: #f44336;">${stats.emergency_drones || 0}</div>
+                        <div class="stat-label">🚨 Emergency Drones</div>
+                    </div>
+                    <div class="stat-item" style="border-left: 4px solid #2196F3;">
+                        <div class="stat-value" style="color: #2196F3;">${stats.normal_drones || 0}</div>
+                        <div class="stat-label">📦 Normal Drones</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.available_drones || 0}</div>
+                        <div class="stat-label">Available (Total)</div>
+                    </div>
+                    <div class="stat-item" style="border-left: 4px solid #f44336;">
+                        <div class="stat-value" style="color: #f44336;">${stats.available_emergency_drones || 0}</div>
+                        <div class="stat-label">Available Emergency</div>
+                    </div>
+                    <div class="stat-item" style="border-left: 4px solid #2196F3;">
+                        <div class="stat-value" style="color: #2196F3;">${stats.available_normal_drones || 0}</div>
+                        <div class="stat-label">Available Normal</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.assigned_drones || 0}</div>
+                        <div class="stat-label">Assigned (Total)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.total_requests || 0}</div>
+                        <div class="stat-label">Total Requests</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.pending_requests || 0}</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.completed_requests || 0}</div>
+                        <div class="stat-label">Completed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.emergency_requests || 0}</div>
+                        <div class="stat-label">Emergency Requests</div>
+                    </div>
+                `;
+                document.getElementById('statistics').innerHTML = statsHtml;
+            } catch (error) {
+                console.error('Statistics update error:', error);
+                document.getElementById('statistics').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading statistics</strong><br>
+                        <small>${error.message}</small>
+                    </div>`;
+            }
+        }
+
+        async function updateEnergyStats() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const stats = await response.json();
+
+                // Update overall display at top
+                const overallEnergyEl = document.getElementById('overallEnergySaved');
+                const overallCarbonEl = document.getElementById('overallCarbonSaved');
+                if (overallEnergyEl) overallEnergyEl.textContent = (stats.total_energy_saved_kwh || 0).toFixed(4);
+                if (overallCarbonEl) overallCarbonEl.textContent = (stats.total_co2_saved_kg || 0).toFixed(4);
+
+                const energyHtml = `
+                    <div class="stat-item energy-stat">
+                        <div class="stat-value">${(stats.total_energy_saved_kwh || 0).toFixed(4)}</div>
+                        <div class="stat-label">Total Energy Saved (kWh)</div>
+                    </div>
+                    <div class="stat-item energy-stat">
+                        <div class="stat-value">${(stats.total_co2_saved_kg || 0).toFixed(4)}</div>
+                        <div class="stat-label">Total CO₂ Saved (kg)</div>
+                    </div>
+                    <div class="stat-item energy-stat">
+                        <div class="stat-value">${(stats.average_energy_saved_per_trip_kwh || 0).toFixed(4)}</div>
+                        <div class="stat-label">Avg per Trip (kWh)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${stats.trips_with_energy_data || 0}</div>
+                        <div class="stat-label">Trips with Energy Data</div>
+                    </div>
+                `;
+                document.getElementById('energyStats').innerHTML = energyHtml;
+            } catch (error) {
+                console.error('Energy stats update error:', error);
+                document.getElementById('energyStats').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading energy stats</strong><br>
+                        <small>${error.message}</small>
+                    </div>`;
+            }
+        }
+
+        async function updateActiveRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/requests/all`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+
+                // Filter for pending and assigned requests
+                const activeRequests = (data.requests || []).filter(req => 
+                    req.status === 'pending' || req.status === 'assigned'
+                );
+
+                if (activeRequests.length === 0) {
+                    document.getElementById('activeRequests').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🚁</div>
+                            <p>No active requests</p>
+                            <p style="font-size: 0.9em; margin-top: 10px;">Create a new request to get started!</p>
+                        </div>`;
+                    return;
+                }
+
+                const requestsHtml = activeRequests.map(req => `
+                    <div class="request-item ${req.status}">
+                        <div class="request-header">
+                            <span class="request-title">
+                                Request #${req.id}
+                                ${req.is_partial_delivery ? `<span class="badge" style="background: #9C27B0; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; margin-left: 5px;">Part ${req.delivery_sequence}/${req.total_deliveries}</span>` : ''}
+                                ${req.emergency ? '<span class="badge badge-emergency">🚨 EMERGENCY</span>' : ''}
+                            </span>
+                            <span class="priority-badge priority-${req.priority.toLowerCase().replace('_', '-')}">${formatCTASPriority(req.priority)}</span>
+                        </div>
+                        <div class="request-details">
+                            <strong>${req.requester_name || req.requester_id}</strong> (ID: ${req.requester_id})<br>
+                            📍 Location: ${req.requester_location_id}<br>
+                            ${req.description ? req.description + '<br>' : ''}
+                            ${req.is_partial_delivery && req.parent_request_id ? `<br><small style="color: #9C27B0;">📋 Part of split order (Parent: Request #${req.parent_request_id})</small>` : ''}
+                            ${req.payload_description && req.payload_weight_kg ? `<br>📦 <strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
+                            <small>Status: ${req.status.toUpperCase()} | Created: ${new Date(req.timestamp).toLocaleString()}</small>
+                            ${req.assigned_drone_id ? `<br><small>✅ Assigned to Drone #${req.assigned_drone_id} - Will auto-complete when drone arrives</small>` : '<br><small>⏳ Waiting for assignment...</small>'}
+                            ${req.vital_priority_score !== undefined ? `<br><small>📊 Vital Priority Score: ${req.vital_priority_score} (for tie-breaking within CTAS level)</small>` : ''}
+                        </div>
+                        <div class="request-actions">
+                            ${req.status === 'pending' ? `
+                                <button class="btn btn-danger btn-small" onclick="cancelRequest(${req.id})">
+                                    ✕ Cancel Request
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('activeRequests').innerHTML = requestsHtml;
+            } catch (error) {
+                console.error('Active requests update error:', error);
+                document.getElementById('activeRequests').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading active requests</strong><br>
+                        <small>${error.message}</small>
+                    </div>`;
+            }
+        }
+
+        async function updateCompletedRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/requests/completed`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                let completedRequests = data.requests || [];
+
+                // Filter out requests older than 30 minutes if auto-remove is enabled
+                if (autoRemoveCompletedEnabled) {
+                    const now = new Date();
+                    const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000); // 30 minutes ago
+                    
+                    completedRequests = completedRequests.filter(req => {
+                        // Use completion timestamp if available, otherwise use request timestamp as fallback
+                        let completionTime;
+                        if (req.completed_at) {
+                            completionTime = new Date(req.completed_at);
+                        } else {
+                            // Fallback to timestamp if completed_at not available (older requests)
+                            completionTime = new Date(req.timestamp);
+                        }
+                        return completionTime > thirtyMinutesAgo;
+                    });
+                }
+                
+                // Sort by completion time (most recent first) or by ID as fallback
+                completedRequests.sort((a, b) => {
+                    const timeA = a.completed_at ? new Date(a.completed_at).getTime() : new Date(a.timestamp).getTime();
+                    const timeB = b.completed_at ? new Date(b.completed_at).getTime() : new Date(b.timestamp).getTime();
+                    return timeB - timeA; // Most recent first
+                });
+
+                if (completedRequests.length === 0) {
+                    const message = autoRemoveCompletedEnabled 
+                        ? 'No completed requests in the last 30 minutes' 
+                        : 'No completed requests yet';
+                    document.getElementById('completedRequests').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">✅</div>
+                            <p>${message}</p>
+                            <p style="font-size: 0.9em; margin-top: 10px;">Complete a request to see energy savings reports!</p>
+                        </div>`;
+                    return;
+                }
+
+                const requestsHtml = completedRequests.map(req => {
+                    const energy = req.energy;
+                    return `
+                        <div class="request-item completed">
+                            <div class="request-header">
+                                <span class="request-title">Request #${req.id} - ${req.requester_name || req.requester_id}</span>
+                                <span class="priority-badge priority-${req.priority.toLowerCase().replace('_', '-')}">${formatCTASPriority(req.priority)}</span>
+                            </div>
+                            <div class="request-details">
+                                ${req.description ? `<strong>${req.description}</strong><br>` : '<em>(No description provided)</em><br>'}
+                                ${req.payload_description && req.payload_weight_kg ? `<br>📦 <strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
+                                <small>Location: ${req.requester_location_id} | Completed: ${new Date(req.timestamp).toLocaleString()}</small>
+                                ${req.assigned_drone_id ? `<br><small>Drone ID: ${req.assigned_drone_id}</small>` : ''}
+                            </div>
+                            ${energy ? `
+                                <div class="energy-details">
+                                    <h4>⚡ Energy Savings Report</h4>
+                                    <div class="energy-grid">
+                                        <div class="energy-item">
+                                            <span>Distance Traveled:</span>
+                                            <span class="energy-value">${energy.distance_km} km (${energy.distance_meters} m)</span>
+                                        </div>
+                                        <div class="energy-item">
+                                            <span>Drone Energy:</span>
+                                            <span class="energy-value">${energy.drone_energy_kwh} kWh</span>
+                                        </div>
+                                        <div class="energy-item">
+                                            <span>Traditional Energy:</span>
+                                            <span class="energy-value">${energy.traditional_energy_kwh} kWh</span>
+                                        </div>
+                                        <div class="energy-item">
+                                            <span>Energy Saved:</span>
+                                            <span class="energy-value" style="color: #2e7d32; font-size: 1.1em;">${energy.energy_saved_kwh} kWh</span>
+                                        </div>
+                                        <div class="energy-item">
+                                            <span>Savings %:</span>
+                                            <span class="energy-value" style="color: #2e7d32; font-size: 1.1em;">${energy.energy_savings_percentage}%</span>
+                                        </div>
+                                        ${energy.co2_saved_kg ? `
+                                            <div class="energy-item full-width">
+                                                <span>🌱 CO₂ Emissions Saved:</span>
+                                                <span class="energy-value" style="color: #2e7d32; font-size: 1.1em;">${energy.co2_saved_kg} kg</span>
+                                            </div>
+                                        ` : ''}
+                                        ${energy.walking_time_minutes !== undefined ? `
+                                            <div class="energy-item full-width" style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
+                                                <h5 style="margin: 0 0 8px 0; color: #667eea;">⏱️ Time Comparison (vs Walking at 3 mph / 4.828 km/h)</h5>
+                                                <div class="energy-item">
+                                                    <span>Walking Time:</span>
+                                                    <span class="energy-value">${energy.walking_time_minutes.toFixed(2)} min (${energy.walking_time_seconds.toFixed(1)} sec)</span>
+                                                </div>
+                                                <div class="energy-item">
+                                                    <span>Drone Time:</span>
+                                                    <span class="energy-value">${energy.drone_time_minutes.toFixed(2)} min (${energy.drone_time_seconds.toFixed(1)} sec)</span>
+                                                </div>
+                                                <div class="energy-item">
+                                                    <span>Time Saved:</span>
+                                                    <span class="energy-value" style="color: #2e7d32; font-size: 1.1em;">${energy.time_saved_minutes.toFixed(2)} min (${energy.time_saved_seconds.toFixed(1)} sec)</span>
+                                                </div>
+                                                <div class="energy-item">
+                                                    <span>Speed Improvement:</span>
+                                                    <span class="energy-value" style="color: #667eea; font-size: 1.1em;">${energy.speed_ratio.toFixed(2)}x faster</span>
+                                                </div>
+                                                <div class="energy-item">
+                                                    <span>Time Savings:</span>
+                                                    <span class="energy-value" style="color: #2e7d32; font-size: 1.1em;">${energy.time_savings_percentage.toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        ${req.path_efficiency ? `
+                                            <div class="energy-item full-width" style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
+                                                <h5 style="margin: 0 0 8px 0; color: #9c27b0;">🛤️ Path Efficiency (RRT vs Dijkstra)</h5>
+                                                <div class="energy-item">
+                                                    <span>Chosen Path (RRT):</span>
+                                                    <span class="energy-value">${req.path_efficiency.chosen_path_distance_meters.toFixed(2)} m</span>
+                                                </div>
+                                                <div class="energy-item">
+                                                    <span>Alternative Path (Dijkstra):</span>
+                                                    <span class="energy-value">${req.path_efficiency.alternative_path_distance_meters.toFixed(2)} m</span>
+                                                </div>
+                                                <div class="energy-item">
+                                                    <span>Efficiency Improvement:</span>
+                                                    <span class="energy-value" style="color: #9c27b0; font-size: 1.1em;">${req.path_efficiency.path_efficiency_percentage.toFixed(2)}%</span>
+                                                </div>
+                                                ${req.path_efficiency.time_saved_vs_alternative_seconds ? `
+                                                    <div class="energy-item">
+                                                        <span>Time Saved:</span>
+                                                        <span class="energy-value" style="color: #9c27b0; font-size: 1.1em;">${req.path_efficiency.time_saved_vs_alternative_seconds.toFixed(2)} sec</span>
+                                                    </div>
+                                                ` : ''}
+                                                ${req.path_efficiency.path_efficiency_ratio ? `
+                                                    <div class="energy-item">
+                                                        <span>Speed Ratio:</span>
+                                                        <span class="energy-value" style="color: #9c27b0; font-size: 1.1em;">${req.path_efficiency.path_efficiency_ratio.toFixed(2)}x more efficient</span>
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            ` : '<div class="energy-details"><p style="color: #666;">Energy data not available for this request.</p></div>'}
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('completedRequests').innerHTML = requestsHtml;
+            } catch (error) {
+                console.error('Completed requests update error:', error);
+                document.getElementById('completedRequests').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading completed requests</strong><br>
+                        <small>${error.message}</small>
+                    </div>`;
+            }
+        }
+
+        // Handle form submission
+        document.getElementById('requestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageEl = document.getElementById('formMessage');
+            messageEl.innerHTML = '';
+
+            // Get selected payload items
+            const payloadItems = getSelectedItems();
+            const totalWeight = calculateTotalWeight();
+            
+            // Note: Payloads > 1.5kg will be automatically split into multiple prioritized requests
+            // Most critical items will be sent first with available drones
+            // Remaining items will be queued until drones become available
+            if (totalWeight > maxPayloadCapacity) {
+                const numDronesNeeded = Math.ceil(totalWeight / maxPayloadCapacity);
+                messageEl.innerHTML = `<div style="background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #ffc107;">
+                    ⚠️ Large payload detected (${totalWeight.toFixed(3)} kg).<br>
+                    This order will be automatically split into ${numDronesNeeded} prioritized requests.<br>
+                    <small>Most critical items (based on patient condition) will be sent first with available drones.<br>
+                    Remaining items will be queued and sent as drones become available.</small>
+                </div>`;
+                showNotification(`Large payload will be split into ${numDronesNeeded} prioritized requests`, 'info', 5000);
+            }
+
+            const formData = {
+                requester_id: document.getElementById('requesterId').value,
+                requester_name: document.getElementById('requesterName').value,
+                requester_location_id: parseInt(document.getElementById('requesterLocationId').value),
+                priority: document.getElementById('priority').value,
+                description: document.getElementById('description').value,
+                emergency: document.getElementById('emergency').checked,
+                // Patient selection (optional - algorithm will compute all prioritization factors automatically)
+                patient_id: document.getElementById('patientId').value || null,
+                // Payload items (only include if items are selected)
+                payload_items: Object.keys(payloadItems).length > 0 ? payloadItems : undefined
+                // Multi-criteria prioritization is automatically computed by the algorithm from patient data
+                // No manual input needed - all values are derived from patient record
+            };
+            
+            // Remove null/undefined/empty values to keep payload clean
+            Object.keys(formData).forEach(key => {
+                if (formData[key] === null || formData[key] === undefined || formData[key] === '') {
+                    delete formData[key];
+                }
+            });
+
+            try {
+                const response = await fetch(`${API_BASE}/request/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.innerHTML = `<div style="background: #e8f5e9; color: #2e7d32; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        ✓ Request #${data.request_id} created successfully! Status: ${data.request_status}
+                        ${data.assigned_drone_id ? ` Assigned to Drone #${data.assigned_drone_id}` : ' Waiting for assignment...'}
+                        ${totalWeight > 0 ? `<br><small>📦 Payload: ${totalWeight.toFixed(3)} kg</small>` : ''}
+                    </div>`;
+                    document.getElementById('requestForm').reset();
+                    // Reset item quantities
+                    if (itemCatalog) {
+                        for (const items of Object.values(itemCatalog)) {
+                            items.forEach(item => {
+                                const input = document.getElementById(`item_${item.id}`);
+                                if (input) input.value = 0;
+                            });
+                        }
+                    }
+                    updatePayloadSummary();
+                    showNotification(`Request #${data.request_id} created successfully!`, 'success');
+                    setTimeout(() => updateDashboard(), 1000);
+                } else {
+                    messageEl.innerHTML = `<div class="error">Error: ${data.error}</div>`;
+                    showNotification(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                messageEl.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                showNotification(`Error: ${error.message}`, 'error');
+            }
+        });
+
+        // Auto-refresh toggle
+        document.getElementById('autoRefresh').addEventListener('change', (e) => {
+            if (e.target.checked) {
+                autoRefreshInterval = setInterval(updateDashboard, 5000);
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+        });
+
+        // Auto-remove completed requests toggle
+        const autoRemoveCheckbox = document.getElementById('autoRemoveCompleted');
+        if (autoRemoveCheckbox) {
+            // Load saved preference from localStorage
+            const savedPreference = localStorage.getItem('autoRemoveCompletedEnabled');
+            if (savedPreference !== null) {
+                autoRemoveCompletedEnabled = savedPreference === 'true';
+                autoRemoveCheckbox.checked = autoRemoveCompletedEnabled;
+            }
+            
+            autoRemoveCheckbox.addEventListener('change', (e) => {
+                autoRemoveCompletedEnabled = e.target.checked;
+                // Save preference to localStorage
+                localStorage.setItem('autoRemoveCompletedEnabled', autoRemoveCompletedEnabled.toString());
+                // Update completed requests display immediately
+                updateCompletedRequests();
+            });
+        }
+
+        // Modal functions
+        async function openCompleteModal(requestId) {
+            currentCompletingRequestId = requestId;
+            
+            // Get request details for display
+            try {
+                const response = await fetch(`${API_BASE}/request/${requestId}`);
+                const req = await response.json();
+                
+                document.getElementById('modalRequestInfo').innerHTML = `
+                    <strong>Request #${req.id}</strong><br>
+                    Requester: ${req.requester_name} (${req.requester_id})<br>
+                    Current Location: ${req.requester_location_id}<br>
+                    Description: ${req.description || '(No description provided)'}<br>
+                    Priority: ${formatCTASPriority(req.priority)}<br>
+                    ${req.payload_description ? `<br>📦 Payload: ${req.payload_description}` : ''}
+                    ${req.payload_weight_kg ? `<br>Payload Weight: ${req.payload_weight_kg.toFixed(3)} kg` : ''}
+                `;
+                
+                // Reset form
+                document.getElementById('completeForm').reset();
+                document.getElementById('finalLocationId').value = '';
+                // Use actual payload weight from request if available, otherwise default
+                document.getElementById('payloadWeight').value = req.payload_weight_kg ? req.payload_weight_kg.toFixed(3) : '0.5';
+                document.getElementById('traditionalMethod').value = 'vehicle';
+                document.getElementById('completeSuccess').classList.remove('show');
+                
+                document.getElementById('completeModal').classList.add('show');
+            } catch (error) {
+                showNotification(`Error loading request details: ${error.message}`, 'error');
+            }
+        }
+
+        function closeCompleteModal() {
+            document.getElementById('completeModal').classList.remove('show');
+            currentCompletingRequestId = null;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('completeModal');
+            if (event.target === modal) {
+                closeCompleteModal();
+            }
+        }
+
+        async function submitCompleteRequest() {
+            if (!currentCompletingRequestId) return;
+
+            const finalLocationId = document.getElementById('finalLocationId').value;
+            const payloadWeight = document.getElementById('payloadWeight').value;
+            const traditionalMethod = document.getElementById('traditionalMethod').value;
+
+            if (!finalLocationId || !payloadWeight) {
+                showNotification('Please fill in all required fields', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/request/${currentCompletingRequestId}/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        final_location_id: parseInt(finalLocationId),
+                        traditional_method: traditionalMethod,
+                        payload_weight_kg: parseFloat(payloadWeight)
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const energy = data.energy_report;
+                    const successMsg = `
+                        Request #${currentCompletingRequestId} completed successfully!<br>
+                        ⚡ Energy saved: ${energy?.energy_saved_kwh?.toFixed(4) || 'N/A'} kWh (${energy?.energy_savings_percentage?.toFixed(2) || 'N/A'}%)<br>
+                        🌱 CO₂ saved: ${energy?.co2_saved_kg?.toFixed(4) || 'N/A'} kg
+                    `;
+                    document.getElementById('completeSuccess').innerHTML = successMsg;
+                    document.getElementById('completeSuccess').classList.add('show');
+                    
+                    showNotification(`Request #${currentCompletingRequestId} completed! Energy saved: ${energy?.energy_saved_kwh?.toFixed(4)} kWh`, 'success');
+                    
+                    setTimeout(() => {
+                        closeCompleteModal();
+                        updateDashboard();
+                    }, 2000);
+                } else {
+                    showNotification(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`Error completing request: ${error.message}`, 'error');
+            }
+        }
+
+        // Cancel request function
+        async function cancelRequest(requestId) {
+            if (!confirm(`Are you sure you want to cancel Request #${requestId}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/request/${requestId}/cancel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showNotification(`Request #${requestId} cancelled successfully`, 'success');
+                    updateDashboard();
+                } else {
+                    showNotification(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`Error cancelling request: ${error.message}`, 'error');
+            }
+        }
+
+        // Make functions available globally
+        window.openCompleteModal = openCompleteModal;
+        window.closeCompleteModal = closeCompleteModal;
+        window.submitCompleteRequest = submitCompleteRequest;
+        window.cancelRequest = cancelRequest;
+
+        // Handle form submission for complete form
+        document.getElementById('completeForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            submitCompleteRequest();
+        });
+
+        // Handle Enter key in modal form fields
+        document.getElementById('completeForm').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                submitCompleteRequest();
+            }
+        });
+
+        // Path Efficiency Chart
+        let pathEfficiencyChart = null;
+        
+        async function updatePathEfficiencyChart() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics/path-efficiency`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                // Update statistics
+                const statsHtml = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #9c27b0;">${data.trips_count || 0}</div>
+                            <div style="font-size: 0.9em; color: #666;">Total Trips</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #9c27b0;">${data.average_efficiency_percentage || 0}%</div>
+                            <div style="font-size: 0.9em; color: #666;">Avg Efficiency</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #2e7d32;">${data.max_efficiency_percentage || 0}%</div>
+                            <div style="font-size: 0.9em; color: #666;">Max Efficiency</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #2e7d32;">${(data.total_time_saved_seconds / 60).toFixed(2) || 0}</div>
+                            <div style="font-size: 0.9em; color: #666;">Total Time Saved (min)</div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('pathEfficiencyStats').innerHTML = statsHtml;
+                
+                // Render or update chart
+                if (!data.data || data.data.length === 0) {
+                    if (pathEfficiencyChart) {
+                        pathEfficiencyChart.destroy();
+                        pathEfficiencyChart = null;
+                    }
+                    document.getElementById('pathEfficiencyChart').style.display = 'none';
+                    return;
+                }
+                
+                document.getElementById('pathEfficiencyChart').style.display = 'block';
+                const ctx = document.getElementById('pathEfficiencyChart').getContext('2d');
+                
+                // Prepare data
+                const sortedData = [...data.data].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                const labels = sortedData.map(d => {
+                    const date = new Date(d.timestamp);
+                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                });
+                const efficiencyPercentages = sortedData.map(d => d.path_efficiency_percentage);
+                
+                if (pathEfficiencyChart) {
+                    // Update existing chart
+                    pathEfficiencyChart.data.labels = labels;
+                    pathEfficiencyChart.data.datasets[0].data = efficiencyPercentages;
+                    pathEfficiencyChart.update();
+                } else {
+                    // Create new chart
+                    pathEfficiencyChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Path Efficiency Improvement (%)',
+                                data: efficiencyPercentages,
+                                borderColor: '#9c27b0',
+                                backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 3,
+                                pointHoverRadius: 5
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'top' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const index = context.dataIndex;
+                                            const dataPoint = sortedData[index];
+                                            return [
+                                                `Efficiency: ${context.parsed.y.toFixed(2)}%`,
+                                                `Time Saved: ${(dataPoint.time_saved_seconds / 60).toFixed(2)} min`,
+                                                `Request #${dataPoint.request_id}`
+                                            ];
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Efficiency Improvement (%)'
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            return value + '%';
+                                        }
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Trip Completion Time'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Path efficiency chart error:', error);
+                document.getElementById('pathEfficiencyStats').innerHTML = `
+                    <div class="error">
+                        <strong>Error loading path efficiency data</strong><br>
+                        <small>${error.message}</small>
+                    </div>`;
+            }
+        }
+        
+        // Initialize on load
+        initializeSystem().then(() => {
+            if (isInitialized) {
+                autoRefreshInterval = setInterval(updateDashboard, 5000);
+            }
+        });
+        
+        // Load item catalog and patients on page load
+        loadItemCatalog();
+        loadPatients();
+        
+        // Make functions available globally
+        window.handlePatientSelection = handlePatientSelection;
+        window.updateVitalsCharts = updateVitalsCharts;
+        window.toggleLiveVitals = toggleLiveVitals;
+
+        // Handle connection errors gracefully
+        window.addEventListener('online', () => {
+            if (!isInitialized) {
+                initializeSystem();
+            } else {
+                updateConnectionStatus(true);
+                showNotification('Connection restored', 'success');
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            updateConnectionStatus(false);
+            showNotification('Connection lost. Please check your internet connection.', 'error', 5000);
+        });
+    </script>
+    
+    <!-- Hospital Map Script -->
+    <script src="/map.js"></script>
+    <script>
+        // Connect map to backend API
+        const API_BASE_MAP = API_BASE; // Use same API base
+        
+        // Location ID to map coordinates mapping
+        // Based on hospital locations: Location(id, name, x, y, floor)
+        // realX/realY are the actual coordinates from the graph, x/y are map display coordinates
+        // Updated to match new detailed floor plan layout
+        const LOCATION_TO_COORDS = {
+            1: { x: 925, y: 510, name: 'Emergency Department (ED)', floor: 1, realX: 0, realY: 0 },      // ED - bottom right
+            2: { x: 775, y: 510, name: 'ICU', floor: 1, realX: 10, realY: 0 },                 // ICU - bottom center-right
+            3: { x: 95, y: 70, name: 'Pharmacy', floor: 1, realX: 20, realY: 0 },            // Pharmacy - top left
+            4: { x: 240, y: 85, name: 'Imaging', floor: 1, realX: 30, realY: 0 },                 // Imaging - top center-left
+            5: { x: 120, y: 500, name: 'Cafeteria / Kitchen', floor: 1, realX: 0, realY: 10 },           // Cafeteria - bottom left
+            6: { x: 520, y: 85, name: 'Beds & Patient Rooms', floor: 1, realX: 10, realY: 10 },              // Ward - top center
+            7: { x: 700, y: 205, name: 'Occupational Therapy', floor: 1, realX: 20, realY: 10 },              // OT - middle right
+            8: { x: 825, y: 380, name: 'Operating Rooms', floor: 1, realX: 30, realY: 10 },             // Surgery - center right
+            // Charging stations (positioned near major rooms)
+            9: { x: 205, y: 70, name: 'Charging Station', floor: 1, realX: 5, realY: 0 },
+            10: { x: 265, y: 70, name: 'Charging Station', floor: 1, realX: 15, realY: 0 },
+            11: { x: 480, y: 85, name: 'Charging Station', floor: 1, realX: 25, realY: 0 },
+            12: { x: 120, y: 350, name: 'Charging Station', floor: 1, realX: 0, realY: 5 },
+            13: { x: 360, y: 355, name: 'Charging Station', floor: 1, realX: 10, realY: 5 },
+            14: { x: 680, y: 380, name: 'Charging Station', floor: 1, realX: 20, realY: 5 },
+            15: { x: 825, y: 450, name: 'Charging Station', floor: 1, realX: 30, realY: 5 },
+            16: { x: 775, y: 510, name: 'Charging Station', floor: 1, realX: 5, realY: 10 },
+            17: { x: 875, y: 380, name: 'Charging Station', floor: 1, realX: 15, realY: 10 },
+            18: { x: 620, y: 470, name: 'Charging Station', floor: 1, realX: 25, realY: 10 },
+        };
+        
+        // Make LOCATION_TO_COORDS available globally
+        window.LOCATION_TO_COORDS = LOCATION_TO_COORDS;
+        
+        // Make API_BASE_MAP available globally for map.js
+        window.API_BASE_MAP = API_BASE_MAP;
+        
+        // Location selection handler
+        window.onLocationSelected = function(locationId, locationName) {
+            // Set the location in the request form
+            const locationInput = document.getElementById('requesterLocationId');
+            if (locationInput) {
+                locationInput.value = locationId;
+                showNotification(`Location selected: ${locationName} (ID: ${locationId})`, 'success');
+            }
+        };
+        
+        // Override the fetchDroneDataFromBackend method in HospitalDroneTracker
+        HospitalDroneTracker.prototype.fetchDroneDataFromBackend = async function() {
+            try {
+                const response = await fetch(`${API_BASE_MAP}/api/drones/all`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                
+                // Convert backend drone data to map format
+                this.drones = (data.drones || []).map(drone => {
+                    const location = LOCATION_TO_COORDS[drone.current_location_id];
+                    if (!location) {
+                        // Try charging stations or use default
+                        const fallbackLoc = LOCATION_TO_COORDS[drone.current_location_id] || { x: 0, y: 0, name: `Location ${drone.current_location_id}`, floor: 1 };
+                        if (!LOCATION_TO_COORDS[drone.current_location_id]) {
+                            console.warn(`Location ${drone.current_location_id} not found in map`);
+                        }
+                    }
+                    
+                    const loc = location || { x: 0, y: 0, name: `Location ${drone.current_location_id}`, floor: 1 };
+                    
+                    // Determine color based on drone type and status
+                    let color = '#95E1D3'; // Default
+                    if (drone.emergency_drone) {
+                        color = drone.status === 'available' ? '#FF6B6B' : '#FF0000'; // Bright red for emergency
+                    } else {
+                        color = drone.status === 'available' ? '#4ECDC4' : '#0066FF'; // Bright blue for normal
+                    }
+                    
+                    // Get assigned request info if available
+                    let name = `Drone #${drone.id}`;
+                    if (drone.assigned_request_id) {
+                        name += ` (Request #${drone.assigned_request_id})`;
+                    }
+                    
+                    // Initialize or update flight tracking if drone has a route
+                    // Use backend start_time if available for accurate position calculation
+                    if (drone.delivery_route && drone.delivery_route.length > 1 && 
+                        (drone.status === 'assigned' || drone.status === 'in_transit')) {
+                        const flightKey = drone.id;
+                        if (!this.droneFlights[flightKey]) {
+                            // Initialize flight tracking when route is first assigned
+                            // Use backend start_time if available, otherwise use current time
+                            const startTime = drone.flight_start_time ? 
+                                new Date(drone.flight_start_time).getTime() : Date.now();
+                            this.droneFlights[flightKey] = {
+                                route: drone.delivery_route,
+                                startTime: startTime,
+                                speed: drone.current_speed_m_per_sec || 2.5,
+                                is_emergency: drone.emergency_drone || false
+                            };
+                        } else {
+                            // Update with backend data
+                            if (drone.flight_start_time) {
+                                this.droneFlights[flightKey].startTime = new Date(drone.flight_start_time).getTime();
+                            }
+                            if (drone.current_speed_m_per_sec) {
+                                this.droneFlights[flightKey].speed = drone.current_speed_m_per_sec;
+                            }
+                            // Update route if it changed (for multi-stop deliveries)
+                            if (drone.delivery_route && JSON.stringify(this.droneFlights[flightKey].route) !== JSON.stringify(drone.delivery_route)) {
+                                this.droneFlights[flightKey].route = drone.delivery_route;
+                                // Use backend start_time if available for new route
+                                if (drone.flight_start_time) {
+                                    this.droneFlights[flightKey].startTime = new Date(drone.flight_start_time).getTime();
+                                } else {
+                                    this.droneFlights[flightKey].startTime = Date.now();
+                                }
+                            }
+                        }
+                    } else if (!drone.assigned_request_id || drone.status === 'available' || drone.status === 'completed' || drone.status === 'charging') {
+                        // Clear flight tracking when drone has no request, becomes available, completed, or charging
+                        // Drones without requests or at charging stations should be stationary
+                        delete this.droneFlights[drone.id];
+                    }
+                    
+                    // Calculate current position along route
+                    // Pass assigned_request_id to ensure drones without requests stay stationary
+                    const currentPos = this.calculateDronePosition({
+                        drone_id: drone.id,
+                        current_location_id: drone.current_location_id,
+                        delivery_route: drone.delivery_route,
+                        status: drone.status,
+                        current_speed_m_per_sec: drone.current_speed_m_per_sec,
+                        emergency_drone: drone.emergency_drone,
+                        assigned_request_id: drone.assigned_request_id // Include request ID for movement check
+                    });
+                    
+                    return {
+                        id: `D${drone.id}`,
+                        floor: loc.floor,
+                        x: currentPos.x,
+                        y: currentPos.y,
+                        color: color,
+                        name: drone.name || name,
+                        status: drone.status === 'available' ? 'Available' : 
+                                drone.status === 'assigned' ? 'Assigned' : 'In Transit',
+                        drone_id: drone.id,
+                        location_id: drone.current_location_id,
+                        location_name: loc.name,
+                        emergency_drone: drone.emergency_drone,
+                        assigned_request_id: drone.assigned_request_id,
+                        // Include full drone data for info display
+                        battery_percent: drone.battery_percent,
+                        battery_level_kwh: drone.battery_level_kwh,
+                        battery_capacity_kwh: drone.battery_capacity_kwh,
+                        current_payload_weight_kg: drone.current_payload_weight_kg,
+                        current_speed_m_per_sec: drone.current_speed_m_per_sec,
+                        delivery_route: drone.delivery_route,
+                        flight_start_time: drone.flight_start_time,  // Backend start time
+                        request_info: drone.request_info,
+                        current_energy_saved_kwh: drone.current_energy_saved_kwh,
+                        current_carbon_saved_kg: drone.current_carbon_saved_kg
+                    };
+                }).filter(d => d !== null); // Remove null entries
+                
+                // Update positions in real-time (for smooth animation)
+                this.updateDronePositions();
+                
+                // Update views
+                if (this.viewMode === '3d') {
+                    this.updateDroneMeshes();
+                } else {
+                    this.render2DFloor();
+                }
+            } catch (error) {
+                console.error('Error fetching drone data:', error);
+            }
+        };
+        
+        // Override startDroneSimulation to use backend polling and smooth animation
+        const originalStartSimulation = HospitalDroneTracker.prototype.startDroneSimulation;
+        HospitalDroneTracker.prototype.startDroneSimulation = function() {
+            // Fetch initial drone data
+            this.fetchDroneDataFromBackend();
+            
+            // Poll backend every 2 seconds for route updates
+            setInterval(() => {
+                this.fetchDroneDataFromBackend();
+            }, 2000);
+            
+            // Update positions smoothly every 100ms for animation
+            // Only re-render 2D view if drones are actually moving (in transit with assigned requests)
+            setInterval(() => {
+                const hasMovingDrones = this.drones.some(d => {
+                    const hasRequest = d.assigned_request_id !== undefined && d.assigned_request_id !== null;
+                    const isInTransit = d.status === 'assigned' || d.status === 'Assigned' || 
+                                       d.status === 'in_transit' || d.status === 'In Transit';
+                    // Only count as moving if drone has a request AND is in transit AND has a route
+                    return hasRequest && isInTransit && d.delivery_route && d.delivery_route.length > 1;
+                });
+                
+                if (hasMovingDrones) {
+                    this.updateDronePositions();
+                    // 3D view updates in animation loop automatically
+                    if (this.viewMode === '2d') {
+                        this.render2DFloor();
+                    }
+                }
+            }, 100); // Smooth 10fps animation for position updates
+        };
+        
+        // Initialize tracker after page loads
+        let hospitalTracker = null;
+        
+        function initializeTracker() {
+            // Check if all required dependencies are loaded
+            if (typeof THREE === 'undefined') {
+                console.error('Three.js is not loaded');
+                return false;
+            }
+            
+            // Check if OrbitControls is available
+            if (typeof THREE.OrbitControls === 'undefined' && typeof OrbitControls === 'undefined') {
+                console.warn('OrbitControls not found - map will work without camera controls');
+            }
+            
+            try {
+                hospitalTracker = new HospitalDroneTracker();
+                console.log('Hospital Drone Tracker initialized successfully');
+                return true;
+            } catch (error) {
+                console.error('Error initializing Hospital Drone Tracker:', error);
+                return false;
+            }
+        }
+        
+        // Initialize tracker when everything is ready
+        function waitForDependencies() {
+            // Check if all required dependencies are loaded
+            if (typeof THREE === 'undefined') {
+                console.log('Waiting for Three.js to load...');
+                setTimeout(waitForDependencies, 100);
+                return;
+            }
+            
+            // Check if DOM elements exist
+            const canvas = document.getElementById('three-canvas');
+            const container = document.getElementById('canvas-container');
+            
+            if (!canvas || !container) {
+                console.log('Waiting for DOM elements...');
+                setTimeout(waitForDependencies, 100);
+                return;
+            }
+            
+            // Check if container has dimensions
+            const rect = container.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                console.log('Waiting for container dimensions...');
+                setTimeout(waitForDependencies, 100);
+                return;
+            }
+            
+            console.log('All dependencies ready, initializing map...');
+            initializeTracker();
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(waitForDependencies, 300);
+            });
+        } else {
+            // DOM already loaded
+            setTimeout(waitForDependencies, 300);
+        }
+    </script>
+</body>
+</html>
