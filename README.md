@@ -33,15 +33,49 @@ This system is designed for the **University of Toronto Engineering Competition 
 
 ```
 TEAM_6/
-├── models.py          # Data structures (Location, Drone, Request, Priority)
-├── graph.py           # HospitalGraph with weighted Dijkstra implementation
-├── service.py         # DroneAssignmentService with priority queue logic
-├── energy.py          # Energy calculation and savings tracking module
-├── main.py            # Entry point, initialization, and example usage
-├── api.py             # Optional Flask REST API wrapper
-├── requirements.txt   # Python dependencies
-└── README.md          # This file
+├── models.py              # Data structures (Location, Drone, Request, Priority, Patient)
+├── graph.py               # HospitalGraph with weighted Dijkstra implementation
+├── service.py             # DroneAssignmentService with priority queue and RRT path planning
+├── energy.py              # Energy calculation and savings tracking module
+├── rrt_pathfinding.py     # RRT (Rapidly-exploring Random Tree) path planner for collision avoidance
+├── items.py               # Item catalog and payload management for drone deliveries
+├── patients.py            # Patient database and vitals management
+├── main.py                # Entry point, initialization, and example usage
+├── api.py                 # Flask REST API server for frontend integration
+├── map.js                 # Three.js-based 3D/2D hospital map visualization
+├── map.css                # Styling for map components
+├── templates/
+│   └── index.html         # Web dashboard UI (main HTML template)
+├── requirements.txt       # Python dependencies
+├── .gitignore            # Git ignore rules
+└── README.md             # This file
 ```
+
+### File Descriptions
+
+- **models.py**: Defines core data structures including `Location`, `Drone`, `Request`, `Priority`, `RequestStatus`, and `Patient` classes. Implements Vital Priority System scoring for patient prioritization.
+
+- **graph.py**: Implements `HospitalGraph` class with weighted Dijkstra's algorithm for finding shortest paths between locations. Manages hospital layout, pathways, and location relationships.
+
+- **service.py**: Core business logic for `DroneAssignmentService`. Handles request creation, priority queue management, drone assignment, route planning with RRT, energy tracking, and request completion. Implements multi-criteria prioritization based on CTAS levels and Vital Priority Scores.
+
+- **energy.py**: `EnergyCalculator` class for calculating drone energy consumption, comparing against traditional methods (vehicle, electric cart, walking), and computing CO₂ emissions saved. Based on Matternet M2 drone specifications.
+
+- **rrt_pathfinding.py**: Implements RRT (Rapidly-exploring Random Tree) path planning algorithm for collision-avoiding drone paths. Supports traffic rules, obstacle avoidance, and multi-drone coordination.
+
+- **items.py**: `ItemCatalog` class managing available items for drone delivery. Handles item categorization, weight calculations, payload validation, and splitting large payloads across multiple requests.
+
+- **patients.py**: Patient database management with vitals tracking. Handles patient data, current vitals, health risks, lifestyle risks, and automatic vitals updates over time. Supports real-time vitals history.
+
+- **main.py**: Initialization script that sets up hospital graph, locations, pathways, charging stations, and drones. Includes example usage demonstrating the system with different priority levels.
+
+- **api.py**: Flask REST API server providing endpoints for request management, drone tracking, statistics, patient data, and energy reports. Serves the web dashboard UI and provides API access for external integrations.
+
+- **map.js**: JavaScript module for 3D/2D hospital map visualization using Three.js. Displays drone locations, routes, real-time movement tracking, and interactive floor plan. Supports both 3D and 2D view modes.
+
+- **map.css**: CSS stylesheet for map container, canvas elements, and related UI components for the hospital map visualization.
+
+- **templates/index.html**: Main web dashboard UI template. Includes request management, drone tracking, system statistics, patient selection, payload management, and real-time updates. Note: Energy savings graph visualization is planned for implementation after the presentation.
 
 ## Installation
 
@@ -76,12 +110,12 @@ python api.py
 
 2. Initialize the system:
 ```bash
-curl -X POST http://localhost:5000/api/initialize
+curl -X POST http://localhost:5001/api/initialize
 ```
 
 3. Create a request:
 ```bash
-curl -X POST http://localhost:5000/api/request/create \
+curl -X POST http://localhost:5001/api/request/create \
   -H "Content-Type: application/json" \
   -d '{
     "requester_id": "DR001",
@@ -95,12 +129,12 @@ curl -X POST http://localhost:5000/api/request/create \
 
 4. Get request status:
 ```bash
-curl http://localhost:5000/api/request/1
+curl http://localhost:5001/api/request/1
 ```
 
 5. Complete a request:
 ```bash
-curl -X POST http://localhost:5000/api/request/1/complete \
+curl -X POST http://localhost:5001/api/request/1/complete \
   -H "Content-Type: application/json" \
   -d '{
     "final_location_id": 3,
@@ -111,7 +145,13 @@ curl -X POST http://localhost:5000/api/request/1/complete \
 
 6. Get system statistics:
 ```bash
-curl http://localhost:5000/api/statistics
+curl http://localhost:5001/api/statistics
+```
+
+7. Access the web dashboard:
+```bash
+# Open in browser:
+http://localhost:5001/
 ```
 
 ## API Endpoints
@@ -293,6 +333,20 @@ The system calculates energy savings by comparing:
 
 - **CO2 Emissions**: Calculated from energy saved using grid emissions factor (0.4 kg CO2/kWh)
 
+## UI Development Status
+
+**Current State**: The web dashboard UI (`templates/index.html`) includes core functionality for request management, drone tracking, system statistics, and patient data visualization. The dashboard provides real-time updates and displays completed request details including energy savings reports.
+
+**Planned After Presentation**:
+- **Energy Savings Graph**: Add a comprehensive graph/chart visualization showing total energy savings over time, including:
+  - Time-series chart of cumulative energy savings (kWh)
+  - CO₂ emissions savings visualization
+  - Per-trip energy savings breakdown
+  - Comparison graphs showing drone efficiency vs traditional methods
+- **Enhanced UI Features**: Improve the overall user experience with additional visualizations and analytics dashboards
+
+Note: While the backend fully supports energy tracking and reporting (accessible via API endpoints and programmatic access), the visual graph component is planned for future implementation after the presentation.
+
 ## Future Enhancements
 
 Potential improvements for production use:
@@ -305,6 +359,7 @@ Potential improvements for production use:
 - Path visualization
 - Customizable energy calculation constants
 - Historical energy reports and analytics
+- Energy savings graph visualization (planned post-presentation)
 
 ## License
 

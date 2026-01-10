@@ -76,15 +76,28 @@ def initialize_hospital_system() -> DroneAssignmentService:
     # set charging station locations (all charging station IDs)
     charging_station_ids = [loc.id for loc in charging_stations]
     service.CHARGING_STATION_LOCATIONS = charging_station_ids
-    # initalize drones at various locations,reserve some drones specifically for emergency requests
-    emergency_drone_locations = [1, 2, 1, 2, 8, 1]  # ER, ICU, Surgery
-    for loc_id in emergency_drone_locations:
-        service.add_drone(loc_id, emergency_drone=True)
-    #  normal drones (for regular requests)
+    # emergency drones: Start at charging stations near emergency locations
+    emergency_drone_count = 6
+    for i in range(emergency_drone_count):
+        # distribute emergency drones across charging stations near emergency areas (locations 1-2)
+        charging_station_id = charging_station_ids[i % len(charging_station_ids)]
+        service.add_drone(charging_station_id, emergency_drone=True)
+        # mark drone as available and at charging station
+        drone = service.drones[service.next_drone_id - 1]
+        drone.status = "available"
+        drone.is_charging = False  # Available at charging station but not currently charging
+        drone.battery_level_kwh = drone.battery_capacity_kwh * 0.8  # Start at 80% charge
+    # normal drones: Start at charging stations (for regular requests)
     normal_drone_count = 14
     for i in range(normal_drone_count):
-        loc_id = locations[i % len(locations)].id
-        service.add_drone(loc_id, emergency_drone=False)
+        # distribute normal drones across all charging stations
+        charging_station_id = charging_station_ids[(i + emergency_drone_count) % len(charging_station_ids)]
+        service.add_drone(charging_station_id, emergency_drone=False)
+        # mark drone as available and at charging station
+        drone = service.drones[service.next_drone_id - 1]
+        drone.status = "available"
+        drone.is_charging = False  # Available at charging station but not currently charging
+        drone.battery_level_kwh = drone.battery_capacity_kwh * 0.8  # Start at 80% charge
     # total: 6 emergency drones + 14 normal drones = 20 drones
     return service
 
@@ -93,7 +106,7 @@ def example_usage():
     # initalize system
     service = initialize_hospital_system()
     print("hospital Drone log syst \n")
-    # Example 1: CTAS I - Resuscitation (cardiac arrest)
+    # ex 1: CTAS I - Resuscitation (cardiac arrest)
     print("ex 1: CTAS I - Resuscitation")
     request1 = service.create_request(
         requester_id="DR001",requester_name="Dr. Smith",requester_location_id=2,  priority=Priority.CTAS_I,description="Cardiac arrest, need emergency medication from pharmacy",

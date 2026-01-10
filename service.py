@@ -232,21 +232,33 @@ class DroneAssignmentService:
             return request.id
     
     def _get_available_drone_locations(self, for_emergency: bool = False) -> List[int]:
-        """ list of location IDs where available drones are located
+        """Get list of location IDs where available drones are located
+        
         Args:
             for_emergency: true - returns only emergency drones, false - returns normal drones.
-                           emergency drones  handle both, normal drones only handle normal requests.
+                           emergency drones handle both, normal drones only handle normal requests.
+        
+        Returns:
+            List of location IDs where available drones are located (at charging stations or other locations)
         """
         available_locations = []
         for drone in self.drones.values():
+            # Only include drones that are:
+            # 1. Available (not assigned, charging, or returning to charging)
+            # 2. Not currently charging
+            # 3. Have sufficient battery
+            # Note: Drones at charging stations but not charging are available for assignment
             if (drone.status == "available" and 
                 not drone.is_charging and
+                drone.status != "returning_to_charging" and
+                drone.status != "assigned" and
                 drone.battery_level_kwh >= self.MIN_BATTERY_THRESHOLD):
                 if for_emergency:
-                    # emergency req can use emergency drones
+                    # Emergency requests can use emergency drones
                     if drone.emergency_drone:
                         available_locations.append(drone.current_location_id)
-                else:# normal requests use normal drones only
+                else:
+                    # Normal requests use normal drones only
                     if not drone.emergency_drone:
                         available_locations.append(drone.current_location_id)
         return available_locations
@@ -299,7 +311,8 @@ class DroneAssignmentService:
     
     def _calculate_current_battery_consumption(self, drone: Drone, current_time: datetime) -> Tuple[float, float]:
         """Calculate battery consumed and distance traveled since flight started"""
-        if drone.status not in ["assigned", "in_transit"] or not drone.delivery_route or len(drone.delivery_route) < 2:
+        # Calculate for drones that are actively moving (assigned, in_transit, or returning to charging)
+        if drone.status not in ["assigned", "in_transit", "returning_to_charging"] or not drone.delivery_route or len(drone.delivery_route) < 2:
             return 0.0, 0.0
         flight_info = self.active_flights.get(drone.id)
         if not flight_info or not flight_info.get('start_time'):
@@ -653,11 +666,23 @@ class DroneAssignmentService:
         #  drone back to available status
         if request.assigned_drone_id:
             drone = self.drones[request.assigned_drone_id]
-            #  start location before updating
-            drone_start_location = drone.current_location_id
             #  total distance traveled using flight route if available
             flight_info = self.active_flights.get(request.assigned_drone_id, {})
-            route = flight_info.get('route', [drone_start_location, request.requester_location_id])
+            route = flight_info.get('route', [])
+            
+            # Get original start location from route if available, otherwise from drone's delivery_route
+            # or fall back to current location (shouldn't happen, but safe fallback)
+            if route and len(route) >= 2:
+                # Use first node in route as the original start location
+                drone_start_location = route[0]
+            elif drone.delivery_route and len(drone.delivery_route) >= 2:
+                # Fallback to drone's delivery route
+                drone_start_location = drone.delivery_route[0]
+                route = drone.delivery_route
+            else:
+                # Last resort: use current location (but this means route tracking is missing)
+                drone_start_location = drone.current_location_id
+                route = [drone_start_location, request.requester_location_id]
             #  total distance from route
             total_distance = 0.0
             if len(route) >= 2:
@@ -715,14 +740,23 @@ class DroneAssignmentService:
             request.payload_weight_kg = payload_weight_kg
             # get path efficiency compared to alternative paths
             # compare w a Dijkstra shortest path (no collision avoidance)
-            self._calculate_path_efficiency(request, drone_start_location, request.requester_location_id, route, drone.current_speed_m_per_sec)
+            # Only calculate if we have a valid route with at least 2 nodes
+            if route and len(route) >= 2 and drone_start_location != request.requester_location_id:
+                # Get speed from flight info if available, otherwise use current speed
+                flight_speed = flight_info.get('speed', drone.current_speed_m_per_sec)
+                if flight_speed <= 0:
+                    flight_speed = self.NORMAL_SPEED_M_PER_SEC
+                self._calculate_path_efficiency(request, drone_start_location, request.requester_location_id, route, flight_speed)
             # after done request process pending requests again so queued parts of split orders to be assigned when drones become available
             self._process_pending_requests()
             self.total_energy_saved_kwh += energy_saved
             self.total_co2_saved_kg += co2_saved
             # Update drone battery (deplete energy used)
-            flight_info = self.active_flights.get(drone.id, {})
-            route = flight_info.get('route', [drone_start_location, request.requester_location_id])
+            # Use the route we already retrieved earlier - don't overwrite it
+            # flight_info and route are already set above (lines 670-685)
+            # Only get request_ids from active_flights if needed
+            if not flight_info:
+                flight_info = self.active_flights.get(drone.id, {})
             # get payload weights for each leg of the route
             payloads = []
             #  all reqs in this flight (if multi-stop)
@@ -761,20 +795,25 @@ class DroneAssignmentService:
                 actual_energy = self._calculate_route_energy(route, payloads, drone.current_speed_m_per_sec)
             #  battery level (deplete energy used during flight)
             drone.battery_level_kwh = max(0.0, drone.battery_level_kwh - actual_energy)
-            #  if battery is low after delivery
-            if drone.battery_level_kwh < self.MIN_BATTERY_THRESHOLD:
-                #  to nearest charging station
-                self._send_drone_to_charging(drone.id)
-            else:
-                #  drone status and location
-                drone.status = "available"
-                drone.current_location_id = drone_final_location_id
-                drone.assigned_request_id = None
-                drone.current_payload_weight_kg = 0.0
-                drone.delivery_route = []
-            # remove from active flights tracking
+            
+            # Remove delivery trip from active_flights tracking (before adding return trip)
+            # This ensures we don't track both delivery and return trips simultaneously
             if drone.id in self.active_flights:
-                del self.active_flights[drone.id]
+                flight_info = self.active_flights[drone.id]
+                # Only remove if it's not already a return trip (shouldn't happen, but be safe)
+                if not flight_info.get('is_return_trip', False):
+                    del self.active_flights[drone.id]
+            
+            # After delivery, ALWAYS return drone to nearest charging station
+            # This ensures drones are always ready for next assignment from a charging station
+            drone.current_location_id = drone_final_location_id
+            drone.assigned_request_id = None
+            drone.current_payload_weight_kg = 0.0
+            drone.delivery_route = []  # Clear delivery route before setting return route
+            
+            # Send drone to nearest charging station (will add return trip to active_flights)
+            # This handles routing, battery consumption during return, and charging
+            self._send_drone_to_charging(drone.id)
         #  pending req
         self._process_pending_requests()
     
@@ -799,45 +838,131 @@ class DroneAssignmentService:
             )
     
     def _send_drone_to_charging(self, drone_id: int):
-        """Send drone to nearest charging station"""
+        """Send drone to nearest charging station and route it there"""
         if drone_id not in self.drones:
             return
-        
         drone = self.drones[drone_id]
-        
-        # Find nearest charging station
+        # if already at a charging station, just start charging
+        if drone.current_location_id in self.CHARGING_STATION_LOCATIONS:
+            drone.status = "charging"
+            drone.is_charging = True
+            drone.assigned_request_id = None
+            drone.current_payload_weight_kg = 0.0
+            drone.delivery_route = []
+            drone.current_speed_m_per_sec = 0.0
+            # calc time to charge (assume charging to 80% for efficiency)
+            energy_needed = (drone.battery_capacity_kwh * 0.8) - drone.battery_level_kwh
+            if energy_needed > 0:
+                charge_time_seconds = energy_needed / self.CHARGE_RATE_KWH_PER_SEC
+                # schedule charging completion
+                timer = threading.Timer(charge_time_seconds, self._complete_charging, args=[drone_id])
+                timer.daemon = True
+                timer.start()
+            return
+        # get nearest charging station and route to it
         nearest_charging = None
         min_distance = float('inf')
+        return_route = []
         
         for charging_loc in self.CHARGING_STATION_LOCATIONS:
             path, distance = self.graph.find_shortest_path(drone.current_location_id, charging_loc)
             if distance < min_distance:
                 min_distance = distance
                 nearest_charging = charging_loc
-        
+                return_route = path if path else [drone.current_location_id, charging_loc]
+
         if nearest_charging is None:
-            # No charging station available, set to first one
+            # no charging station available, set to first one
             nearest_charging = self.CHARGING_STATION_LOCATIONS[0]
+            return_route = [drone.current_location_id, nearest_charging]
         
-        # Update drone status and move to charging station
-        # Drones will remain stationary at the charging station until charging completes
-        drone.status = "charging"
-        drone.is_charging = True
-        drone.current_location_id = nearest_charging
-        drone.assigned_request_id = None
-        drone.current_payload_weight_kg = 0.0  # Clear payload when going to charge
-        drone.delivery_route = []  # Clear any route
-        drone.current_speed_m_per_sec = 0.0  # Stationary at charging station
-        
-        # Calculate time to charge (assume charging to 80% for efficiency)
-        energy_needed = (drone.battery_capacity_kwh * 0.8) - drone.battery_level_kwh
-        if energy_needed > 0:
-            charge_time_seconds = energy_needed / self.CHARGE_RATE_KWH_PER_SEC
+        # if drone needs to travel to charging station, simulate the return trip
+        if len(return_route) >= 2 and drone.current_location_id != nearest_charging:
+            # Calculate return trip distance and time
+            return_distance = sum(
+                self.graph.find_shortest_path(return_route[i], return_route[i + 1])[1]
+                for i in range(len(return_route) - 1)
+            ) if len(return_route) >= 2 else min_distance
+            # use normal speed for return trip (no payload)
+            return_speed = self.NORMAL_SPEED_M_PER_SEC
+            return_time_seconds = (return_distance / return_speed) + 2  # Add 2 seconds for arrival
+            # update drone status for transit to charging station
+            drone.status = "returning_to_charging"
+            drone.assigned_request_id = None
+            drone.current_payload_weight_kg = 0.0
+            drone.delivery_route = return_route
+            drone.current_speed_m_per_sec = return_speed
             
-            # Schedule charging completion
-            timer = threading.Timer(charge_time_seconds, self._complete_charging, args=[drone_id])
+            # Store return trip info in active_flights for tracking (similar to delivery trips)
+            # This allows the API/frontend to track the drone's return journey even if map doesn't render
+            self.active_flights[drone.id] = {
+                'route': return_route,
+                'payload_weight': 0.0,  # No payload on return trip
+                'start_time': datetime.now(),
+                'request_ids': [],
+                'speed': return_speed,
+                'is_emergency': False,
+                'initial_battery_kwh': drone.battery_level_kwh,
+                'distance_traveled_meters': 0.0,
+                'is_new_flight': True,
+                'is_return_trip': True  # Mark this as a return trip (not a delivery)
+            }
+            
+            # Schedule arrival at charging station
+            def arrive_at_charging_station():
+                with self.lock:
+                    if drone_id in self.drones:
+                        drone = self.drones[drone_id]
+                        # Update battery based on return trip
+                        return_distance_meters = return_distance * 1.0  # Convert to meters
+                        return_energy = EnergyCalculator.calculate_drone_energy(return_distance_meters, 0.0)  # No payload on return
+                        drone.battery_level_kwh = max(0.0, drone.battery_level_kwh - return_energy)
+                        
+                        # Arrive at charging station
+                        drone.current_location_id = nearest_charging
+                        drone.status = "charging"
+                        drone.is_charging = True
+                        drone.delivery_route = []  # Clear route
+                        drone.current_speed_m_per_sec = 0.0
+                        
+                        # Remove from active flights tracking (return trip complete)
+                        if drone.id in self.active_flights:
+                            del self.active_flights[drone.id]
+                        
+                        # Start charging
+                        energy_needed = (drone.battery_capacity_kwh * 0.8) - drone.battery_level_kwh
+                        if energy_needed > 0:
+                            charge_time_seconds = energy_needed / self.CHARGE_RATE_KWH_PER_SEC
+                            timer = threading.Timer(charge_time_seconds, self._complete_charging, args=[drone_id])
+                            timer.daemon = True
+                            timer.start()
+                        else:
+                            # Already charged enough, make available immediately
+                            self._complete_charging(drone_id)
+            
+            timer = threading.Timer(return_time_seconds, arrive_at_charging_station)
             timer.daemon = True
             timer.start()
+        else:
+            # Already at charging station or route is invalid, start charging immediately
+            drone.current_location_id = nearest_charging
+            drone.status = "charging"
+            drone.is_charging = True
+            drone.assigned_request_id = None
+            drone.current_payload_weight_kg = 0.0
+            drone.delivery_route = []
+            drone.current_speed_m_per_sec = 0.0
+            
+            # Calculate time to charge
+            energy_needed = (drone.battery_capacity_kwh * 0.8) - drone.battery_level_kwh
+            if energy_needed > 0:
+                charge_time_seconds = energy_needed / self.CHARGE_RATE_KWH_PER_SEC
+                timer = threading.Timer(charge_time_seconds, self._complete_charging, args=[drone_id])
+                timer.daemon = True
+                timer.start()
+            else:
+                # Already charged enough
+                self._complete_charging(drone_id)
     
     def _complete_charging(self, drone_id: int):
         """Complete drone charging"""

@@ -8,6 +8,7 @@ from items import ItemCatalog
 from patients import get_patient, get_all_patients
 from main import initialize_hospital_system
 from service import DroneAssignmentService
+from energy import EnergyCalculator
 app = Flask(__name__)
 CORS(app)
 service: Optional[DroneAssignmentService] = None
@@ -96,7 +97,12 @@ def create_request():
     """Create a new drone request"""
     if service is None:
         return jsonify({"error": "Service not initialized"}), 400
-    data = request.get_json
+    
+    # Get JSON data from request
+    data = request.get_json()
+    if data is None:
+        return jsonify({"error": "Invalid JSON data or Content-Type not application/json"}), 400
+    
     required_fields = ['requester_id', 'requester_name', 'requester_location_id', 'priority']
     for field in required_fields:
         if field not in data:
@@ -280,14 +286,47 @@ def get_all_drones():
                 if req.status == RequestStatus.COMPLETED and req.energy_saved_kwh:
                     current_energy_saved = req.energy_saved_kwh
                     current_carbon_saved = req.co2_saved_kg if hasattr(req, 'co2_saved_kg') and req.co2_saved_kg else 0.0
-        # get flight info if in transit
+        # Get flight info if in transit (includes delivery trips and return trips to charging)
         flight_info = service.active_flights.get(drone.id, {})
-        route = flight_info.get('route', []) if flight_info else []
-        flight_start_time = flight_info.get('start_time') if flight_info else None
+        # Get route from flight_info first (most accurate), fallback to drone's delivery_route
+        # This handles both delivery trips (in active_flights) and return trips (also in active_flights)
+        route = []
+        if flight_info and flight_info.get('route'):
+            route = flight_info.get('route', [])
+        elif hasattr(drone, 'delivery_route') and drone.delivery_route:
+            route = drone.delivery_route
+        
+        flight_start_time = flight_info.get('start_time') if flight_info else drone.flight_start_time
         battery_consumed_this_flight = 0.0
         distance_traveled_meters = 0.0
-        if drone.status in ["assigned", "in_transit"]:
-            battery_consumed_this_flight, distance_traveled_meters = service._calculate_current_battery_consumption(drone.id)
+        
+        # Calculate battery consumption for drones that are actively moving
+        # This includes: assigned (delivery), in_transit (delivery), and returning_to_charging (return trip)
+        if drone.status in ["assigned", "in_transit", "returning_to_charging"]:
+            try:
+                # Use the service method to calculate current battery consumption
+                # This works for all statuses: assigned, in_transit, and returning_to_charging
+                battery_consumed_this_flight, distance_traveled_meters = service._calculate_current_battery_consumption(drone, datetime.now())
+            except Exception as e:
+                # Fallback: calculate from route if available
+                if route and len(route) >= 2:
+                    total_distance = 0.0
+                    for i in range(len(route) - 1):
+                        try:
+                            _, segment_dist = service.graph.find_shortest_path(route[i], route[i + 1])
+                            total_distance += segment_dist
+                        except Exception:
+                            pass
+                    distance_traveled_meters = total_distance * 1.0  # Convert graph units to meters
+                    # Use appropriate payload weight based on trip type
+                    if flight_info.get('is_return_trip', False):
+                        payload = 0.0  # No payload on return trip
+                    else:
+                        payload = flight_info.get('payload_weight', getattr(drone, 'current_payload_weight_kg', 0.5))
+                    battery_consumed_this_flight = EnergyCalculator.calculate_drone_energy(distance_traveled_meters, payload)
+                else:
+                    battery_consumed_this_flight = 0.0
+                    distance_traveled_meters = 0.0
          #  start_time to ISO string if it exists
         flight_start_time_iso = None
         if flight_start_time:

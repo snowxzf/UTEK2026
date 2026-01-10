@@ -965,17 +965,19 @@
         }
 
         #canvas-container {
-            width: 100%;
-            height: 500px;
-            min-height: 500px;
+            width: 100% !important;
+            height: 500px !important;
+            min-height: 500px !important;
+            max-height: 1000px;
             border: 2px solid #ddd;
             border-radius: 5px;
             background: #f5f5f5;
-            position: relative;
+            position: relative !important;
             flex: 1;
             display: flex !important;
             visibility: visible !important;
             overflow: hidden;
+            box-sizing: border-box;
         }
 
         #three-canvas {
@@ -983,9 +985,15 @@
             height: 100% !important;
             display: block !important;
             visibility: visible !important;
-            background-color: #f0f0f0;
-            min-width: 400px;
-            min-height: 300px;
+            background-color: #f0f0f0 !important;
+            min-width: 400px !important;
+            min-height: 300px !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
         }
 
         #floor-plan-container {
@@ -1146,17 +1154,6 @@
                     <span>Auto-refresh (5s)</span>
                     <span class="refresh-indicator">⟳</span>
                 </span>
-            </div>
-            <!-- Overall Carbon & Energy Display -->
-            <div id="overallEnergyDisplay" style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; margin-bottom: 5px;" id="overallEnergySaved">0.0000</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Total Energy Saved (kWh)</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; margin-bottom: 5px;" id="overallCarbonSaved">0.0000</div>
-                    <div style="font-size: 0.9em; opacity: 0.9;">Total CO₂ Saved (kg)</div>
-                </div>
             </div>
         </div>
 
@@ -1358,29 +1355,8 @@
                 </div>
             </div>
 
-            <!-- Energy Savings Card -->
-            <div class="card">
-                <h2>Energy Savings</h2>
-                <div class="stat-grid" id="energyStats">
-                    <div class="loading">Loading energy data...</div>
-                </div>
-            </div>
         </div>
 
-        <!-- Path Efficiency Analysis -->
-        <div class="card full-width">
-            <h2>Path Efficiency Analysis</h2>
-            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
-                Comparison of RRT-optimized paths (with collision avoidance) vs Dijkstra shortest paths (no collision avoidance).
-                Shows how much more efficient our path planning algorithm is compared to alternative routing methods.
-            </p>
-            <div style="height: 400px; position: relative;">
-                <canvas id="pathEfficiencyChart"></canvas>
-            </div>
-            <div id="pathEfficiencyStats" style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
-                <div class="loading">Loading path efficiency data...</div>
-            </div>
-        </div>
     </div>
 
     <script>
@@ -2156,10 +2132,8 @@
 
                 await Promise.all([
                     updateStatistics(),
-                    updateEnergyStats(),
                     updateActiveRequests(),
-                    updateCompletedRequests(),
-                    updatePathEfficiencyChart()
+                    updateCompletedRequests()
                 ]);
 
                 const indicator2 = document.querySelector('.refresh-indicator');
@@ -2237,48 +2211,6 @@
             }
         }
 
-        async function updateEnergyStats() {
-            try {
-                const response = await fetch(`${API_BASE}/statistics`);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                const stats = await response.json();
-
-                // Update overall display at top
-                const overallEnergyEl = document.getElementById('overallEnergySaved');
-                const overallCarbonEl = document.getElementById('overallCarbonSaved');
-                if (overallEnergyEl) overallEnergyEl.textContent = (stats.total_energy_saved_kwh || 0).toFixed(4);
-                if (overallCarbonEl) overallCarbonEl.textContent = (stats.total_co2_saved_kg || 0).toFixed(4);
-
-                const energyHtml = `
-                    <div class="stat-item energy-stat">
-                        <div class="stat-value">${(stats.total_energy_saved_kwh || 0).toFixed(4)}</div>
-                        <div class="stat-label">Total Energy Saved (kWh)</div>
-                    </div>
-                    <div class="stat-item energy-stat">
-                        <div class="stat-value">${(stats.total_co2_saved_kg || 0).toFixed(4)}</div>
-                        <div class="stat-label">Total CO₂ Saved (kg)</div>
-                    </div>
-                    <div class="stat-item energy-stat">
-                        <div class="stat-value">${(stats.average_energy_saved_per_trip_kwh || 0).toFixed(4)}</div>
-                        <div class="stat-label">Avg per Trip (kWh)</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.trips_with_energy_data || 0}</div>
-                        <div class="stat-label">Trips with Energy Data</div>
-                    </div>
-                `;
-                document.getElementById('energyStats').innerHTML = energyHtml;
-            } catch (error) {
-                console.error('Energy stats update error:', error);
-                document.getElementById('energyStats').innerHTML = `
-                    <div class="error">
-                        <strong>Error loading energy stats</strong><br>
-                        <small>${error.message}</small>
-                    </div>`;
-            }
-        }
 
         async function updateActiveRequests() {
             try {
@@ -2318,7 +2250,7 @@
                             📍 Location: ${req.requester_location_id}<br>
                             ${req.description ? req.description + '<br>' : ''}
                             ${req.is_partial_delivery && req.parent_request_id ? `<br><small style="color: #9C27B0;">📋 Part of split order (Parent: Request #${req.parent_request_id})</small>` : ''}
-                            ${req.payload_description && req.payload_weight_kg ? `<br>📦 <strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
+                            ${req.payload_description && req.payload_weight_kg ? `<br><strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
                             <small>Status: ${req.status.toUpperCase()} | Created: ${new Date(req.timestamp).toLocaleString()}</small>
                             ${req.assigned_drone_id ? `<br><small>✅ Assigned to Drone #${req.assigned_drone_id} - Will auto-complete when drone arrives</small>` : '<br><small>⏳ Waiting for assignment...</small>'}
                             ${req.vital_priority_score !== undefined ? `<br><small>📊 Vital Priority Score: ${req.vital_priority_score} (for tie-breaking within CTAS level)</small>` : ''}
@@ -2401,13 +2333,13 @@
                             </div>
                             <div class="request-details">
                                 ${req.description ? `<strong>${req.description}</strong><br>` : '<em>(No description provided)</em><br>'}
-                                ${req.payload_description && req.payload_weight_kg ? `<br>📦 <strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
+                                ${req.payload_description && req.payload_weight_kg ? `<br><strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
                                 <small>Location: ${req.requester_location_id} | Completed: ${new Date(req.timestamp).toLocaleString()}</small>
                                 ${req.assigned_drone_id ? `<br><small>Drone ID: ${req.assigned_drone_id}</small>` : ''}
                             </div>
                             ${energy ? `
                                 <div class="energy-details">
-                                    <h4>⚡ Energy Savings Report</h4>
+                                    <h4>Energy Savings Report</h4>
                                     <div class="energy-grid">
                                         <div class="energy-item">
                                             <span>Distance Traveled:</span>
@@ -2431,13 +2363,13 @@
                                         </div>
                                         ${energy.co2_saved_kg ? `
                                             <div class="energy-item full-width">
-                                                <span>🌱 CO₂ Emissions Saved:</span>
+                                                <span>CO₂ Emissions Saved:</span>
                                                 <span class="energy-value" style="color: #2e7d32; font-size: 1.1em;">${energy.co2_saved_kg} kg</span>
                                             </div>
                                         ` : ''}
                                         ${energy.walking_time_minutes !== undefined ? `
                                             <div class="energy-item full-width" style="border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px;">
-                                                <h5 style="margin: 0 0 8px 0; color: #667eea;">⏱️ Time Comparison (vs Walking at 3 mph / 4.828 km/h)</h5>
+                                                <h5 style="margin: 0 0 8px 0; color: #667eea;">Time Comparison (vs Walking at 3 mph / 4.828 km/h)</h5>
                                                 <div class="energy-item">
                                                     <span>Walking Time:</span>
                                                     <span class="energy-value">${energy.walking_time_minutes.toFixed(2)} min (${energy.walking_time_seconds.toFixed(1)} sec)</span>
@@ -2554,19 +2486,37 @@
             });
 
             try {
+                // Ensure service is initialized before creating request
+                if (!isInitialized) {
+                    console.log('Service not initialized, initializing now...');
+                    await initializeSystem();
+                }
+                
                 const response = await fetch(`${API_BASE}/request/create`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
                 });
 
+                if (!response.ok) {
+                    // Try to parse error response
+                    let errorMessage = `HTTP ${response.status}`;
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                        errorMessage = await response.text() || errorMessage;
+                    }
+                    throw new Error(errorMessage);
+                }
+
                 const data = await response.json();
 
-                if (response.ok) {
+                if (data && data.request_id) {
                     messageEl.innerHTML = `<div style="background: #e8f5e9; color: #2e7d32; padding: 10px; border-radius: 5px; margin-top: 10px;">
                         ✓ Request #${data.request_id} created successfully! Status: ${data.request_status}
                         ${data.assigned_drone_id ? ` Assigned to Drone #${data.assigned_drone_id}` : ' Waiting for assignment...'}
-                        ${totalWeight > 0 ? `<br><small>📦 Payload: ${totalWeight.toFixed(3)} kg</small>` : ''}
+                        ${totalWeight > 0 ? `<br><small>Payload: ${totalWeight.toFixed(3)} kg</small>` : ''}
                     </div>`;
                     document.getElementById('requestForm').reset();
                     // Reset item quantities
@@ -2582,12 +2532,23 @@
                     showNotification(`Request #${data.request_id} created successfully!`, 'success');
                     setTimeout(() => updateDashboard(), 1000);
                 } else {
-                    messageEl.innerHTML = `<div class="error">Error: ${data.error}</div>`;
-                    showNotification(`Error: ${data.error}`, 'error');
+                    const errorMsg = data.error || 'Unknown error';
+                    messageEl.innerHTML = `<div class="error">Error: ${errorMsg}</div>`;
+                    showNotification(`Error: ${errorMsg}`, 'error');
                 }
             } catch (error) {
-                messageEl.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-                showNotification(`Error: ${error.message}`, 'error');
+                console.error('Request creation error:', error);
+                const errorMessage = error.message || 'Failed to create request. Please check your connection and try again.';
+                messageEl.innerHTML = `<div class="error">Error: ${errorMessage}</div>`;
+                showNotification(`Error: ${errorMessage}`, 'error');
+                
+                // If it's a service not initialized error, try to initialize
+                if (errorMessage.includes('Service not initialized') || errorMessage.includes('not initialized')) {
+                    console.log('Attempting to initialize service...');
+                    initializeSystem().then(() => {
+                        showNotification('Service initialized. Please try creating the request again.', 'info', 5000);
+                    });
+                }
             }
         });
 
@@ -2637,7 +2598,7 @@
                     Current Location: ${req.requester_location_id}<br>
                     Description: ${req.description || '(No description provided)'}<br>
                     Priority: ${formatCTASPriority(req.priority)}<br>
-                    ${req.payload_description ? `<br>📦 Payload: ${req.payload_description}` : ''}
+                    ${req.payload_description ? `<br>Payload: ${req.payload_description}` : ''}
                     ${req.payload_weight_kg ? `<br>Payload Weight: ${req.payload_weight_kg.toFixed(3)} kg` : ''}
                 `;
                 
@@ -2697,8 +2658,8 @@
                     const energy = data.energy_report;
                     const successMsg = `
                         Request #${currentCompletingRequestId} completed successfully!<br>
-                        ⚡ Energy saved: ${energy?.energy_saved_kwh?.toFixed(4) || 'N/A'} kWh (${energy?.energy_savings_percentage?.toFixed(2) || 'N/A'}%)<br>
-                        🌱 CO₂ saved: ${energy?.co2_saved_kg?.toFixed(4) || 'N/A'} kg
+                        Energy saved: ${energy?.energy_saved_kwh?.toFixed(4) || 'N/A'} kWh (${energy?.energy_savings_percentage?.toFixed(2) || 'N/A'}%)<br>
+                        CO₂ saved: ${energy?.co2_saved_kg?.toFixed(4) || 'N/A'} kg
                     `;
                     document.getElementById('completeSuccess').innerHTML = successMsg;
                     document.getElementById('completeSuccess').classList.add('show');
@@ -2762,133 +2723,6 @@
             }
         });
 
-        // Path Efficiency Chart
-        let pathEfficiencyChart = null;
-        
-        async function updatePathEfficiencyChart() {
-            try {
-                const response = await fetch(`${API_BASE}/statistics/path-efficiency`);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                
-                // Update statistics
-                const statsHtml = `
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #9c27b0;">${data.trips_count || 0}</div>
-                            <div style="font-size: 0.9em; color: #666;">Total Trips</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #9c27b0;">${data.average_efficiency_percentage || 0}%</div>
-                            <div style="font-size: 0.9em; color: #666;">Avg Efficiency</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #2e7d32;">${data.max_efficiency_percentage || 0}%</div>
-                            <div style="font-size: 0.9em; color: #666;">Max Efficiency</div>
-                        </div>
-                        <div style="text-align: center;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #2e7d32;">${(data.total_time_saved_seconds / 60).toFixed(2) || 0}</div>
-                            <div style="font-size: 0.9em; color: #666;">Total Time Saved (min)</div>
-                        </div>
-                    </div>
-                `;
-                document.getElementById('pathEfficiencyStats').innerHTML = statsHtml;
-                
-                // Render or update chart
-                if (!data.data || data.data.length === 0) {
-                    if (pathEfficiencyChart) {
-                        pathEfficiencyChart.destroy();
-                        pathEfficiencyChart = null;
-                    }
-                    document.getElementById('pathEfficiencyChart').style.display = 'none';
-                    return;
-                }
-                
-                document.getElementById('pathEfficiencyChart').style.display = 'block';
-                const ctx = document.getElementById('pathEfficiencyChart').getContext('2d');
-                
-                // Prepare data
-                const sortedData = [...data.data].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-                const labels = sortedData.map(d => {
-                    const date = new Date(d.timestamp);
-                    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                });
-                const efficiencyPercentages = sortedData.map(d => d.path_efficiency_percentage);
-                
-                if (pathEfficiencyChart) {
-                    // Update existing chart
-                    pathEfficiencyChart.data.labels = labels;
-                    pathEfficiencyChart.data.datasets[0].data = efficiencyPercentages;
-                    pathEfficiencyChart.update();
-                } else {
-                    // Create new chart
-                    pathEfficiencyChart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Path Efficiency Improvement (%)',
-                                data: efficiencyPercentages,
-                                borderColor: '#9c27b0',
-                                backgroundColor: 'rgba(156, 39, 176, 0.1)',
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 3,
-                                pointHoverRadius: 5
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: true, position: 'top' },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function(context) {
-                                            const index = context.dataIndex;
-                                            const dataPoint = sortedData[index];
-                                            return [
-                                                `Efficiency: ${context.parsed.y.toFixed(2)}%`,
-                                                `Time Saved: ${(dataPoint.time_saved_seconds / 60).toFixed(2)} min`,
-                                                `Request #${dataPoint.request_id}`
-                                            ];
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    title: {
-                                        display: true,
-                                        text: 'Efficiency Improvement (%)'
-                                    },
-                                    ticks: {
-                                        callback: function(value) {
-                                            return value + '%';
-                                        }
-                                    }
-                                },
-                                x: {
-                                    title: {
-                                        display: true,
-                                        text: 'Trip Completion Time'
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Path efficiency chart error:', error);
-                document.getElementById('pathEfficiencyStats').innerHTML = `
-                    <div class="error">
-                        <strong>Error loading path efficiency data</strong><br>
-                        <small>${error.message}</small>
-                    </div>`;
-            }
-        }
-        
         // Initialize on load
         initializeSystem().then(() => {
             if (isInitialized) {
@@ -3140,6 +2974,12 @@
                 return false;
             }
             
+            // Check if HospitalDroneTracker class is loaded
+            if (typeof HospitalDroneTracker === 'undefined') {
+                console.error('HospitalDroneTracker class is not loaded. map.js may not have loaded correctly.');
+                return false;
+            }
+            
             // Check if OrbitControls is available
             if (typeof THREE.OrbitControls === 'undefined' && typeof OrbitControls === 'undefined') {
                 console.warn('OrbitControls not found - map will work without camera controls');
@@ -3147,19 +2987,45 @@
             
             try {
                 hospitalTracker = new HospitalDroneTracker();
+                if (!hospitalTracker) {
+                    console.error('Failed to create HospitalDroneTracker instance - constructor returned null/undefined');
+                    return false;
+                }
                 console.log('Hospital Drone Tracker initialized successfully');
                 return true;
             } catch (error) {
                 console.error('Error initializing Hospital Drone Tracker:', error);
+                console.error('Error stack:', error.stack);
                 return false;
             }
         }
         
         // Initialize tracker when everything is ready
+        let dependencyCheckAttempts = 0;
+        const MAX_ATTEMPTS = 100; // Maximum 10 seconds (100 * 100ms)
+        
         function waitForDependencies() {
+            dependencyCheckAttempts++;
+            
+            if (dependencyCheckAttempts > MAX_ATTEMPTS) {
+                console.error('Timeout waiting for dependencies after', MAX_ATTEMPTS * 100, 'ms');
+                const container = document.getElementById('canvas-container');
+                if (container) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; color: red; background: #fee; border: 2px solid red; border-radius: 5px;"><strong>Map Initialization Timeout</strong><br>Please refresh the page. Check browser console (F12) for errors.</div>';
+                }
+                return;
+            }
+            
             // Check if all required dependencies are loaded
             if (typeof THREE === 'undefined') {
-                console.log('Waiting for Three.js to load...');
+                console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for Three.js to load...');
+                setTimeout(waitForDependencies, 100);
+                return;
+            }
+            
+            // Check if HospitalDroneTracker class is loaded (map.js must be loaded)
+            if (typeof HospitalDroneTracker === 'undefined') {
+                console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for map.js to load...');
                 setTimeout(waitForDependencies, 100);
                 return;
             }
@@ -3167,23 +3033,41 @@
             // Check if DOM elements exist
             const canvas = document.getElementById('three-canvas');
             const container = document.getElementById('canvas-container');
+            const floorSvg = document.getElementById('floor-svg');
             
-            if (!canvas || !container) {
-                console.log('Waiting for DOM elements...');
+            if (!canvas || !container || !floorSvg) {
+                console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for DOM elements...', {
+                    canvas: !!canvas,
+                    container: !!container,
+                    floorSvg: !!floorSvg
+                });
                 setTimeout(waitForDependencies, 100);
                 return;
             }
             
-            // Check if container has dimensions
+            // Check if container has dimensions - don't block if zero, let constructor handle it
             const rect = container.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) {
-                console.log('Waiting for container dimensions...');
-                setTimeout(waitForDependencies, 100);
-                return;
+                console.log('Attempt', dependencyCheckAttempts + ':', 'Container has zero dimensions, but proceeding anyway...');
+                // Don't return - let the constructor handle dimension setting
             }
             
-            console.log('All dependencies ready, initializing map...');
-            initializeTracker();
+            console.log('All dependencies ready, initializing map...', {
+                THREE: typeof THREE !== 'undefined',
+                HospitalDroneTracker: typeof HospitalDroneTracker !== 'undefined',
+                canvas: !!canvas,
+                container: !!container,
+                containerSize: { width: rect.width, height: rect.height }
+            });
+            
+            const success = initializeTracker();
+            if (!success) {
+                console.error('Map initialization failed - check console for details');
+                const containerEl = document.getElementById('canvas-container');
+                if (containerEl && !containerEl.innerHTML.includes('Error') && !containerEl.innerHTML.includes('Timeout')) {
+                    containerEl.innerHTML = '<div style="padding: 20px; text-align: center; color: red; background: #fee; border: 2px solid red; border-radius: 5px;"><strong>Map Initialization Failed</strong><br>Check browser console (F12) for details.</div>';
+                }
+            }
         }
         
         if (document.readyState === 'loading') {
