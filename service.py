@@ -22,18 +22,31 @@ class DroneAssignmentService:
         self.total_energy_saved_kwh = 0.0
         self.total_co2_saved_kg = 0.0
         self.lock = threading.Lock()
-        # speed  by priority
-        self.EMERGENCY_SPEED_M_PER_SEC = 4.0
-        self.NORMAL_SPEED_M_PER_SEC = 2.5
-        self.LOW_PRIORITY_SPEED_M_PER_SEC = 1.5
+        # operational speeds by priority (hospital internal use)
+        # note: Matternet M2 max speed is 16 m/s (57.6 km/h), but operational speeds are lower for safety
+        self.EMERGENCY_SPEED_M_PER_SEC = 4.0  # emergency priority
+        self.NORMAL_SPEED_M_PER_SEC = 2.5  # normal priority
+        self.LOW_PRIORITY_SPEED_M_PER_SEC = 1.5  # low priority
+        # max speed constant (Matternet M2: 16 m/s / 57.6 km/h)
+        self.MAX_DRONE_SPEED_M_PER_SEC = 16.0
+        # wind tolerance (Matternet M2: up to 12 m/s / 43 km/h)
+        self.WIND_TOLERANCE_M_PER_SEC = 12.0
         # battery amounts
         self.MIN_BATTERY_THRESHOLD = 0.0243
         self.CHARGING_STATION_LOCATIONS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
         self.CHARGE_RATE_KWH_PER_SEC = 0.01
+        # material pickup time (seconds per item for drone to pick up materials at pickup location)
+        self.MATERIAL_PICKUP_TIME_PER_ITEM_SECONDS = 10.0
         self.active_flights: Dict[int, dict] = {}
         # RRT path planner for collision avoidance
-        search_bounds = [(-5.0, 35.0), (-5.0, 15.0)]
-        self.rrt_planner = RRTPathPlanner(graph=self.graph, search_space_bounds=search_bounds,obstacle_radius=1.5  # 1.5m padding radius around drones
+        # Scaled to 186m width (x: 0-186, y: 0-60) - hallways represented by pathways
+        # 3-lane system: each hallway supports 3 drones side-by-side (3m total width, 1m per lane)
+        search_bounds = [(-30.0, 216.0), (-30.0, 90.0)]
+        self.rrt_planner = RRTPathPlanner(
+            graph=self.graph, 
+            search_space_bounds=search_bounds,
+            obstacle_radius=1.5,  # 1.5m padding radius around drones (3 lanes × 0.5m per drone = 1.5m total)
+            lane_width=1.0  # 1m per lane (3 lanes = 3m total hallway width)
         )
     def add_drone(self, location_id: int, emergency_drone: bool = False) -> int:
         """Add a new drone at the specified location"""
@@ -69,7 +82,7 @@ class DroneAssignmentService:
         Reference: Dery et al. (2020) - A systematic review of patient prioritization tools
         
         items define what the drone will carry:
-        - if payload > 1.5kg, automatically split into multiple requests
+        - if payload > 2.0kg, automatically split into multiple requests
         - critical items are first with available drones
         - items are queued until drones become available
         Reference: Jeong et al. (2019) - Truck-drone hybrid delivery routing
@@ -155,7 +168,7 @@ class DroneAssignmentService:
                     emergency = emergency or True
         #  if emergency based on CTAS (I and II are emergency) or patient condition
         is_emergency_request = emergency or priority.is_emergency
-        #  if payload needs to be split (if > 1.5kg)
+        #  if payload needs to be split (if > 2.0kg)
         total_weight = ItemCatalog.calculate_total_weight(payload_items or {})
         if total_weight > ItemCatalog.MAX_PAYLOAD_CAPACITY_KG:
             #  payload into multiple prioritized requests
@@ -205,7 +218,7 @@ class DroneAssignmentService:
             #  parent request ID (first request)
             return parent_request_id
         else:
-            # single request (payload <= 1.5kg)
+            # single request (payload <= 2.0kg)
             request = Request( # too long LOL
                 id=self.next_request_id,
                 requester_id=requester_id,
@@ -276,10 +289,15 @@ class DroneAssignmentService:
         self,request: Request,drone_start_location_id: int,destination_location_id: int,chosen_route: List[int], drone_speed_m_per_sec: float
     ):
         """
-        path efficiency by comparing chosen RRT-optimized path with alternative paths (e.g., simple Dijkstra shortest path)
-        stores efficiency metrics in request:
-        - chosen_path_distance_meters: distance of current path
-        - alternative_path_distance_meters: distance of alt path
+        Calculate path efficiency by comparing the actual drone path (RRT+Dijkstra together) 
+        with the next quickest alternative path (second shortest Dijkstra path).
+        
+        The drone uses Dijkstra to find the shortest path, then RRT for collision avoidance.
+        So the chosen path is the result of both algorithms working together.
+        
+        Stores efficiency metrics in request:
+        - chosen_path_distance_meters: distance of actual drone path (RRT+Dijkstra)
+        - alternative_path_distance_meters: distance of next quickest path (second shortest)
         - path_efficiency_percentage: how much more efficient chosen path is (0-100%)
         - time_saved_vs_alternative_seconds: time saved compared to alternative
         - path_efficiency_ratio: ratio of alternative_time / chosen_time (higher = more efficient)
@@ -291,7 +309,11 @@ class DroneAssignmentService:
             for i in range(len(chosen_route) - 1)
         )
         chosen_distance_meters = chosen_distance
-        _, alternative_distance = self.graph.find_shortest_path(drone_start_location_id,destination_location_id)
+        # Compare against the NEXT quickest path (second shortest), not the shortest
+        _, alternative_distance = self.graph.find_second_shortest_path(drone_start_location_id, destination_location_id)
+        # If no second path exists, fall back to shortest path
+        if alternative_distance == float('inf'):
+            _, alternative_distance = self.graph.find_shortest_path(drone_start_location_id, destination_location_id)
         alternative_distance_meters = alternative_distance
         if drone_speed_m_per_sec > 0:
             chosen_time = chosen_distance_meters / drone_speed_m_per_sec
@@ -406,13 +428,19 @@ class DroneAssignmentService:
             }
             # get RRT path for combined route (collision avoidance)
             # ref: RRT* algorithm for dynamic obstacle avoidance (see rrt_pathfinding.py)
+            # Get priority level from drone's assigned request (default to 3 if not available)
+            priority_level = 3
+            if drone.assigned_request_id and drone.assigned_request_id in self.requests:
+                req = self.requests[drone.assigned_request_id]
+                priority_level = req.priority.value if req.priority else 3
             rrt_path = self.rrt_planner.plan_path_with_traffic_rules(
                 start_loc=start_loc,
                 goal_loc=goal_loc,
                 current_drone_id=drone.id,
                 is_emergency=drone.emergency_drone,
                 active_drone_flights=other_flights,
-                all_drones=self.drones
+                all_drones=self.drones,
+                current_priority_level=priority_level
             )
             #  RRT path if available, otherwise use original combined route
             if rrt_path and len(rrt_path) >= 2:
@@ -596,11 +624,99 @@ class DroneAssignmentService:
             'distance_traveled_meters': 0.0,
             'is_new_flight': True
         }
-        travel_time_seconds = (distance / priority_speed) + 5
+        # Calculate pickup time based on number of items (10 seconds per item)
+        item_count = sum(request.payload_items.values()) if request.payload_items else 1
+        pickup_time = self.MATERIAL_PICKUP_TIME_PER_ITEM_SECONDS * item_count
+        travel_time_seconds = (distance / priority_speed) + pickup_time
         timer = threading.Timer(travel_time_seconds, self._auto_complete_request, args=[request.id])
         timer.daemon = True
         timer.start()
         return True
+    
+    def _try_assign_new_request_to_drone(self, drone_id: int) -> bool:
+        """Try to assign a pending request to a specific drone after completing a request"""
+        if drone_id not in self.drones:
+            return False
+        drone = self.drones[drone_id]
+        # drone must be available and have enough battery
+        if (drone.status != "available" or 
+            drone.is_charging or 
+            drone.battery_level_kwh < self.MIN_BATTERY_THRESHOLD):
+            return False
+        # get pending requests in priority order
+        self._update_waiting_times()
+        pending_requests = [req for req in self.priority_queue if req.status == RequestStatus.PENDING]
+        if not pending_requests:
+            return False
+        # sort by priority (lower priority value = higher priority)
+        pending_requests.sort(key=lambda r: (r.priority.value, r.waiting_time_minutes))
+        # try to assign first available request
+        for request in pending_requests:
+            if request.status != RequestStatus.PENDING:
+                continue
+            # check if this request can be assigned to this drone
+            is_emergency = request.emergency or request.priority.is_emergency
+            # check if drone type matches (emergency vs normal)
+            if is_emergency != drone.emergency_drone:
+                continue
+            # check battery requirements
+            start_loc = self.graph.nodes[drone.current_location_id]
+            goal_loc = self.graph.nodes[request.requester_location_id]
+            # use RRT pathfinding for free-space navigation (avoiding obstacles/rooms)
+            # Get priority level from request
+            request_priority = request.priority.value if request.priority else 3
+            path = self.rrt_planner.plan_path_with_traffic_rules(
+                start_loc=start_loc,
+                goal_loc=goal_loc,
+                current_drone_id=drone.id,
+                is_emergency=is_emergency,
+                active_drone_flights=self.active_flights,
+                all_drones=self.drones,
+                current_priority_level=request_priority
+            )
+            if len(path) < 2:
+                # fallback to shortest path if RRT fails
+                path, _ = self.graph.find_shortest_path(drone.current_location_id, request.requester_location_id)
+            distance = sum(
+                self.graph.find_shortest_path(path[i], path[i + 1])[1]
+                for i in range(len(path) - 1)
+            ) if len(path) >= 2 else self.graph.find_shortest_path(drone.current_location_id, request.requester_location_id)[1]
+            payload_weight = request.payload_weight_kg or 0.5
+            required_energy = EnergyCalculator.calculate_drone_energy(distance, payload_weight)
+            if drone.battery_level_kwh < required_energy + self.MIN_BATTERY_THRESHOLD:
+                continue  # not enough battery for this request
+            # assign this request to the drone
+            priority_speed = self._get_speed_for_priority(request.priority)
+            drone.current_speed_m_per_sec = priority_speed
+            drone.status = "assigned"
+            drone.assigned_request_id = request.id
+            drone.current_payload_weight_kg = payload_weight
+            drone.delivery_route = path
+            drone.flight_start_time = datetime.now()
+            drone.battery_consumed_this_flight_kwh = 0.0
+            request.status = RequestStatus.ASSIGNED
+            request.assigned_drone_id = drone.id
+            self.active_flights[drone.id] = {
+                'route': path,
+                'payload_weight': payload_weight,
+                'start_time': datetime.now(),
+                'request_ids': [request.id],
+                'speed': priority_speed,
+                'is_emergency': is_emergency,
+                'priority_level': request.priority.value if request.priority else 3,
+                'initial_battery_kwh': drone.battery_level_kwh,
+                'distance_traveled_meters': 0.0,
+                'is_new_flight': True
+            }
+            # Calculate pickup time based on number of items (10 seconds per item)
+            item_count = sum(request.payload_items.values()) if request.payload_items else 1
+            pickup_time = self.MATERIAL_PICKUP_TIME_PER_ITEM_SECONDS * item_count
+            travel_time_seconds = (distance / priority_speed) + pickup_time
+            timer = threading.Timer(travel_time_seconds, self._auto_complete_request, args=[request.id])
+            timer.daemon = True
+            timer.start()
+            return True
+        return False
     
     def _update_waiting_times(self):
         """Update waiting time for all pending requests (used in prioritization)"""
@@ -729,7 +845,13 @@ class DroneAssignmentService:
                 traditional_method=traditional_method
             )
              #  CO2 savings
-            co2_saved = EnergyCalculator.calculate_co2_equivalent(energy_saved, energy_source="grid")
+            # use improved calculation that accounts for UAV being 47x more efficient and 22x cleaner than vans
+            if traditional_method == "vehicle":
+                # compare drone vs delivery van (UAV is 47x more efficient and 22x cleaner)
+                co2_saved = EnergyCalculator.calculate_co2_savings_drone_vs_van(drone_energy, traditional_energy)
+            else:
+                # for other methods (walking, electric_cart), use standard calculation
+                co2_saved = EnergyCalculator.calculate_co2_equivalent(energy_saved, energy_source="grid")
             # update request with energy data
             request.distance_traveled_meters = distance_meters
             request.drone_energy_kwh = drone_energy
@@ -804,16 +926,22 @@ class DroneAssignmentService:
                 if not flight_info.get('is_return_trip', False):
                     del self.active_flights[drone.id]
             
-            # After delivery, ALWAYS return drone to nearest charging station
-            # This ensures drones are always ready for next assignment from a charging station
+            # After delivery, check if there's a new request for this drone first
+            # If no new request is available, return drone to nearest charging station
             drone.current_location_id = drone_final_location_id
             drone.assigned_request_id = None
             drone.current_payload_weight_kg = 0.0
             drone.delivery_route = []  # Clear delivery route before setting return route
+            drone.status = "available"  # Make drone available for new assignment
             
-            # Send drone to nearest charging station (will add return trip to active_flights)
-            # This handles routing, battery consumption during return, and charging
-            self._send_drone_to_charging(drone.id)
+            # Check if there's a pending request that can be assigned to this drone
+            new_request_assigned = self._try_assign_new_request_to_drone(drone.id)
+            
+            # If no new request was assigned, send drone to nearest charging station
+            if not new_request_assigned:
+                # Send drone to nearest charging station using shortest path
+                # This handles routing, battery consumption during return, and charging
+                self._send_drone_to_charging(drone.id)
         #  pending req
         self._process_pending_requests()
     
@@ -1008,8 +1136,11 @@ class DroneAssignmentService:
             if r.status == RequestStatus.COMPLETED and r.energy_saved_kwh is not None
         ]
         
+        # Calculate totals from individual requests (more reliable than instance variables)
+        total_energy_saved = sum(r.energy_saved_kwh for r in completed_with_energy) if completed_with_energy else 0.0
+        total_co2_saved = sum(r.co2_saved_kg for r in completed_with_energy if r.co2_saved_kg is not None) if completed_with_energy else 0.0
         avg_energy_saved = (
-            sum(r.energy_saved_kwh for r in completed_with_energy) / len(completed_with_energy)
+            total_energy_saved / len(completed_with_energy)
             if completed_with_energy else 0.0
         )
         
@@ -1031,9 +1162,9 @@ class DroneAssignmentService:
             "pending_requests": sum(1 for r in self.requests.values() if r.status == RequestStatus.PENDING),
             "completed_requests": sum(1 for r in self.requests.values() if r.status == RequestStatus.COMPLETED),
             "emergency_requests": sum(1 for r in self.requests.values() if r.emergency),
-            # Energy statistics
-            "total_energy_saved_kwh": round(self.total_energy_saved_kwh, 4),
-            "total_co2_saved_kg": round(self.total_co2_saved_kg, 4),
+            # Energy statistics - calculate from individual requests for accuracy
+            "total_energy_saved_kwh": round(total_energy_saved, 4),
+            "total_co2_saved_kg": round(total_co2_saved, 4),
             "average_energy_saved_per_trip_kwh": round(avg_energy_saved, 4),
             "trips_with_energy_data": len(completed_with_energy)
         }

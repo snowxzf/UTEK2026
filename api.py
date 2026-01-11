@@ -68,6 +68,18 @@ def serialize_request(req: Request, include_energy: bool = False) -> dict:
             "time_saved_vs_alternative_seconds": round(req.time_saved_vs_alternative_seconds, 2) if req.time_saved_vs_alternative_seconds else None,
             "path_efficiency_ratio": round(req.path_efficiency_ratio, 2) if req.path_efficiency_ratio else None
         }
+    
+    # Add route information if available (from drone's delivery_route or active_flights)
+    if req.assigned_drone_id and service:
+        drone = service.drones.get(req.assigned_drone_id)
+        if drone:
+            # Try to get route from active_flights first (most recent)
+            flight_info = service.active_flights.get(req.assigned_drone_id, {})
+            route = flight_info.get('route', [])
+            if not route and hasattr(drone, 'delivery_route') and drone.delivery_route:
+                route = drone.delivery_route
+            if route:
+                req_data["route"] = route
     return req_data
 @app.route('/')
 def index():
@@ -79,6 +91,30 @@ def serve_map_js():
     from flask import send_from_directory
     import os
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'map.js', mimetype='application/javascript')
+
+@app.route('/map.css')
+def serve_map_css():
+    """Serve the map.css file"""
+    from flask import send_from_directory
+    import os
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'map.css', mimetype='text/css')
+
+@app.route('/image.png')
+def serve_image_png():
+    """Serve image.png file (Floor 1)"""
+    from flask import send_from_directory
+    import os
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(os.path.join(root_dir, 'templates'), 'image.png', mimetype='image/png')
+
+@app.route('/image2.png')
+def serve_image2_png():
+    """Serve image2.png file (Floor 2)"""
+    from flask import send_from_directory
+    import os
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(os.path.join(root_dir, 'templates'), 'image2.png', mimetype='image/png')
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
@@ -538,6 +574,53 @@ def get_energy_report(request_id):
     if not energy_report:
         return jsonify({"error": "Energy data not available for this request"}), 404
     return jsonify(energy_report)
+
+@app.route('/api/graph/structure', methods=['GET'])
+def get_graph_structure():
+    """Get the hospital graph structure (locations and pathways) for visualization"""
+    if service is None:
+        return jsonify({"error": "Service not initialized"}), 400
+    
+    # Get all locations
+    locations = []
+    for loc_id, location in service.graph.nodes.items():
+        locations.append({
+            "id": location.id,
+            "name": location.name,
+            "x": location.x,
+            "y": location.y,
+            "floor": location.floor
+        })
+    
+    # Get all pathways (edges)
+    pathways = []
+    for from_id, edges in service.graph.adjacency_list.items():
+        for to_id, weight in edges:
+            # Only add each edge once (since bidirectional, we'll get duplicates)
+            # Add if from_id < to_id to avoid duplicates
+            if from_id < to_id:
+                from_loc = service.graph.nodes[from_id]
+                to_loc = service.graph.nodes[to_id]
+                pathways.append({
+                    "from_id": from_id,
+                    "to_id": to_id,
+                    "from_x": from_loc.x,
+                    "from_y": from_loc.y,
+                    "to_x": to_loc.x,
+                    "to_y": to_loc.y,
+                    "weight": weight
+                })
+    
+    return jsonify({
+        "locations": locations,
+        "pathways": pathways,
+        "bounds": {
+            "x_min": min(loc.x for loc in service.graph.nodes.values()),
+            "x_max": max(loc.x for loc in service.graph.nodes.values()),
+            "y_min": min(loc.y for loc in service.graph.nodes.values()),
+            "y_max": max(loc.y for loc in service.graph.nodes.values())
+        }
+    })
 
 @app.route('/api/statistics/path-efficiency', methods=['GET'])
 def get_path_efficiency_statistics():

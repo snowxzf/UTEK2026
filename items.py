@@ -22,10 +22,10 @@ class ItemCatalog:
     weight values based on typical medical supplies
     ref: Jeong et al. (2019) - Truck-drone hybrid delivery routing
     """
-    # max payload capacity based on Matternet-style small delivery drones
-    # Matternet develops small drones for lightweight parcel delivery
-    # typical payload: 1-2 kg for small delivery drones
-    MAX_PAYLOAD_CAPACITY_KG = 1.5  # Maximum total payload weight in kg
+    # max payload capacity based on Matternet M2 drone specifications
+    # Matternet M2: max payload 2 kg (approx. 4.4 lbs)
+    # ref: Matternet M2 drone specifications
+    MAX_PAYLOAD_CAPACITY_KG = 2.0  # Maximum total payload weight in kg
      # item catalog organized by category
     # Priority levels: 10 = life-critical, 5 = important, 1 = routine
     ITEMS: Dict[str, List[Item]] = {
@@ -112,14 +112,14 @@ class ItemCatalog:
     def validate_payload(cls, item_quantities: Dict[str, int]) -> Tuple[bool, Optional[str], float]:
         """
           payload has at least one item
-        :Payloads > 1.5kg will be automatically split into multiple requests
+        :Payloads > 2.0kg will be automatically split into multiple requests
         Args:item_quantities: Dictionary mapping item_id to quantity
         Returns:Tuple of (is_valid, error_message, total_weight_kg)
         """
         total_weight = cls.calculate_total_weight(item_quantities)
         if total_weight <= 0:
             return False, "Please select at least one item", 0.0
-        # Payloads > 1.5kg will be automatically split into multiple requests
+        # Payloads > 2.0kg will be automatically split into multiple requests
         # So we don't return an error here, just return the total weight
         return True, None, total_weight
     

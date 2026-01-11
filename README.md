@@ -16,9 +16,27 @@ Demo: https://drive.google.com/file/d/1g4pHR3_r5QDC2kCOILnMMqGwaZwHQfoD/view?usp
   - Normal High (Priority 2): Important medication, sample transport
   - Normal Low (Priority 1): Food delivery, non-urgent supplies
 
-- **Weighted Dijkstra's Algorithm**: Finds the closest available drone to any requester location
+- **Advanced Pathfinding**: 
+  - Weighted Dijkstra's Algorithm for shortest path calculation
+  - RRT (Rapidly-exploring Random Tree) path planning for collision avoidance
+  - Combined RRT+Dijkstra algorithm for optimal routing with dynamic obstacle avoidance
 
-- **Automatic Assignment**: Requests are automatically assigned to the nearest available drone based on priority
+- **3-Lane Traffic System**: 
+  - Each hallway supports 3 drones side-by-side (3m total width, 1m per lane)
+  - Priority-based lane assignment (emergency/high-priority drones use middle lane)
+  - Yielding system where lower-priority drones yield to higher-priority ones
+
+- **Automatic Assignment**: Requests are automatically assigned to the nearest available drone based on proximity and priority
+
+- **Expanded Hospital Layout**: 
+  - 14 main locations (IDs 1-8, 19-24) including Emergency Room, ICU, Pharmacy, Lab, Surgery, Radiology, Cardiology, etc.
+  - 20 charging stations (IDs 9-18, 25-28) strategically placed in hallways
+  - Complex pathway network for realistic routing scenarios
+
+- **Drone Distribution**: 
+  - 6 emergency drones and 14 normal drones (20 total)
+  - Half of each type start at leftmost node (Emergency Room), half at rightmost node (Lab)
+  - Closest-drone assignment based on shortest path distance
 
 - **Energy Savings Tracking**: 
   - Calculates energy consumption per trip (drone vs traditional methods)
@@ -26,8 +44,12 @@ Demo: https://drive.google.com/file/d/1g4pHR3_r5QDC2kCOILnMMqGwaZwHQfoD/view?usp
   - Compares against traditional methods (vehicles, electric carts, walking staff)
   - Displays energy reports for each completed request
   - Shows system-wide energy statistics
+  - Path efficiency comparison (actual algorithm vs next quickest path)
 
-- **Infinite Drones Assumption**: System tracks drone locations but assumes infinite availability
+- **Real-Time Visualizations**:
+  - Multi-drone traffic system visualization showing priority-based lane usage
+  - Individual path visualization with actual hospital hallways displayed
+  - Graph structure visualization showing all pathways and locations
 
 - **Modular Architecture**: Clean separation of concerns with data models, graph algorithms, and service layer
 
@@ -39,15 +61,15 @@ TEAM_6/
 ├── graph.py               # HospitalGraph with weighted Dijkstra implementation
 ├── service.py             # DroneAssignmentService with priority queue and RRT path planning
 ├── energy.py              # Energy calculation and savings tracking module
-├── rrt_pathfinding.py     # RRT (Rapidly-exploring Random Tree) path planner for collision avoidance
+├── rrt_pathfinding.py     # RRT path planner with 3-lane traffic system and collision avoidance
 ├── items.py               # Item catalog and payload management for drone deliveries
 ├── patients.py            # Patient database and vitals management
-├── main.py                # Entry point, initialization, and example usage
+├── main.py                # Entry point, initialization (14 locations, 20 charging stations, 20 drones)
 ├── api.py                 # Flask REST API server for frontend integration
-├── map.js                 # Three.js-based 3D/2D hospital map visualization
-├── map.css                # Styling for map components
 ├── templates/
-│   └── index.html         # Web dashboard UI (main HTML template)
+│   ├── index.html         # Web dashboard UI with visualizations
+│   ├── image.png          # Hospital map image
+│   └── image2.png         # Additional hospital visualization
 ├── requirements.txt       # Python dependencies
 ├── .gitignore            # Git ignore rules
 └── README.md             # This file
@@ -63,7 +85,7 @@ TEAM_6/
 
 - **energy.py**: `EnergyCalculator` class for calculating drone energy consumption, comparing against traditional methods (vehicle, electric cart, walking), and computing CO₂ emissions saved. Based on Matternet M2 drone specifications.
 
-- **rrt_pathfinding.py**: Implements RRT (Rapidly-exploring Random Tree) path planning algorithm for collision-avoiding drone paths. Supports traffic rules, obstacle avoidance, and multi-drone coordination.
+- **rrt_pathfinding.py**: Implements RRT (Rapidly-exploring Random Tree) path planning algorithm for collision-avoiding drone paths. Supports 3-lane traffic system, priority-based lane assignment, yielding logic, obstacle avoidance, and multi-drone coordination. Combined with Dijkstra for optimal pathfinding.
 
 - **items.py**: `ItemCatalog` class managing available items for drone delivery. Handles item categorization, weight calculations, payload validation, and splitting large payloads across multiple requests.
 
@@ -73,11 +95,9 @@ TEAM_6/
 
 - **api.py**: Flask REST API server providing endpoints for request management, drone tracking, statistics, patient data, and energy reports. Serves the web dashboard UI and provides API access for external integrations.
 
-- **map.js**: JavaScript module for 3D/2D hospital map visualization using Three.js. Displays drone locations, routes, real-time movement tracking, and interactive floor plan. Supports both 3D and 2D view modes.
+Note: map.js and map.css have been removed. Hospital layout visualization is now integrated directly into templates/index.html using SVG.
 
-- **map.css**: CSS stylesheet for map container, canvas elements, and related UI components for the hospital map visualization.
-
-- **templates/index.html**: Main web dashboard UI template. Includes request management, drone tracking, system statistics, patient selection, payload management, and real-time updates. Note: Energy savings graph visualization is planned for implementation after the presentation.
+- **templates/index.html**: Main web dashboard UI template. Includes request management, drone tracking, system statistics, patient selection, payload management, real-time updates, multi-drone traffic visualization, individual path visualization with hospital layout, path efficiency comparison charts, and environmental impact analysis. Location IDs: 1-28 (14 locations + 20 charging stations).
 
 ## Installation
 
@@ -166,7 +186,9 @@ http://localhost:5001/
 - `POST /api/request/<id>/cancel` - Cancel a pending request
 - `GET /api/requests/pending` - Get all pending requests
 - `GET /api/drone/<id>` - Get drone details
+- `GET /api/drones/all` - Get all drones with their current status and routes
 - `GET /api/statistics` - Get system statistics (includes total energy savings)
+- `GET /api/graph/structure` - Get hospital graph structure (locations, pathways, bounds)
 - `GET /api/health` - Health check
 
 ## Code Examples

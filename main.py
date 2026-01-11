@@ -11,60 +11,91 @@ def initialize_hospital_system() -> DroneAssignmentService:
     """
     graph = HospitalGraph()
     # add hospital locations (example floor plan)
+    # Scaled to 186m width (scale factor 186/180 = 1.0333...) - hallways represented by pathways
     locations = [
         Location(1, "Emergency Room", 0, 0, 1),
-        Location(2, "ICU", 10, 0, 1),
-        Location(3, "Pharmacy", 20, 0, 1),
-        Location(4, "Lab", 30, 0, 1),
-        Location(5, "Cafeteria", 0, 10, 1),
-        Location(6, "Ward A", 10, 10, 1),
-        Location(7, "Ward B", 20, 10, 1),
-        Location(8, "Surgery", 30, 10, 1),
+        Location(2, "ICU", 62, 0, 1),
+        Location(3, "Pharmacy", 124, 0, 1),
+        Location(4, "Lab", 186, 0, 1),
+        Location(5, "Cafeteria", 0, 60, 1),
+        Location(6, "Ward A", 62, 60, 1),
+        Location(7, "Ward B", 124, 60, 1),
+        Location(8, "Surgery", 186, 60, 1),
+        # Additional locations for more complex routing
+        Location(19, "Radiology", 31, 30, 1),
+        Location(20, "Physical Therapy", 93, 30, 1),
+        Location(21, "Cardiology", 155, 30, 1),
+        Location(22, "Oncology", 31, 90, 1),
+        Location(23, "Orthopedics", 93, 90, 1),
+        Location(24, "Neurology", 155, 90, 1),
     ]
-    # add charging stations between each room
-    # chargings stations are placed at midpoints between adjacent rooms
+    # add charging stations between each room (in hallways)
+    # chargings stations are placed at midpoints between adjacent rooms in hallways
     charging_stations = [
-        Location(9, "Charging Station 1-2", 5, 0, 1),      #  ER and ICU
-        Location(10, "Charging Station 2-3", 15, 0, 1),    #  ICU and Pharmacy
-        Location(11, "Charging Station 3-4", 25, 0, 1),    #  Pharmacy and Lab
-        Location(12, "Charging Station 1-5", 0, 5, 1),     #  ER and Cafeteria
-        Location(13, "Charging Station 2-6", 10, 5, 1),    #  ICU and Ward A
-        Location(14, "Charging Station 3-7", 20, 5, 1),    #  Pharmacy and Ward B
-        Location(15, "Charging Station 4-8", 30, 5, 1),    #  Lab and Surgery
-        Location(16, "Charging Station 5-6", 5, 10, 1),    # Cafeteria and Ward A
-        Location(17, "Charging Station 6-7", 15, 10, 1),   #  Ward A and Ward B
-        Location(18, "Charging Station 7-8", 25, 10, 1),   #  Ward B and Surgery
+        Location(9, "Charging Station 1-2", 31, 0, 1),      #  ER and ICU (hallway)
+        Location(10, "Charging Station 2-3", 93, 0, 1),    #  ICU and Pharmacy (hallway)
+        Location(11, "Charging Station 3-4", 155, 0, 1),    #  Pharmacy and Lab (hallway)
+        Location(12, "Charging Station 1-5", 0, 30, 1),     #  ER and Cafeteria (hallway)
+        Location(13, "Charging Station 2-6", 62, 30, 1),    #  ICU and Ward A (hallway)
+        Location(14, "Charging Station 3-7", 124, 30, 1),    #  Pharmacy and Ward B (hallway)
+        Location(15, "Charging Station 4-8", 186, 30, 1),    #  Lab and Surgery (hallway)
+        Location(16, "Charging Station 5-6", 31, 60, 1),    # Cafeteria and Ward A (hallway)
+        Location(17, "Charging Station 6-7", 93, 60, 1),   #  Ward A and Ward B (hallway)
+        Location(18, "Charging Station 7-8", 155, 60, 1),   #  Ward B and Surgery (hallway)
+        # Additional charging stations for new locations
+        Location(25, "Charging Station 19-20", 62, 30, 1),   # Radiology and Physical Therapy
+        Location(26, "Charging Station 20-21", 124, 30, 1),  # Physical Therapy and Cardiology
+        Location(27, "Charging Station 22-23", 62, 90, 1),   # Oncology and Orthopedics
+        Location(28, "Charging Station 23-24", 124, 90, 1),  # Orthopedics and Neurology
     ]
     all_locations = locations + charging_stations
     for loc in all_locations:
         graph.add_location(loc)
-    # add pathways between rooms (original pathways)
+    # add pathways between rooms (hallways - pathways represent hallways/corridors)
+    # Scaled to 186m width (scale factor 186/180 = 1.0333...)
     pathways = [
-        (1, 2, 10.0),  # ER to ICU
-        (2, 3, 10.0),  # ICU to Pharmacy
-        (3, 4, 10.0),  # Pharmacy to Lab
-        (1, 5, 14.1),  # ER to Cafeteria (diagonal)
-        (2, 6, 10.0),  # ICU to Ward A
-        (3, 7, 10.0),  # Pharmacy to Ward B
-        (4, 8, 10.0),  # Lab to Surgery
-        (5, 6, 10.0),  # Cafeteria to Ward A
-        (6, 7, 10.0),  # Ward A to Ward B
-        (7, 8, 10.0),  # Ward B to Surgery
+        (1, 2, 62.0),  # ER to ICU (via hallway)
+        (2, 3, 62.0),  # ICU to Pharmacy (via hallway)
+        (3, 4, 62.0),  # Pharmacy to Lab (via hallway)
+        (1, 5, 84.9),  # ER to Cafeteria (diagonal hallway)
+        (2, 6, 62.0),  # ICU to Ward A (via hallway)
+        (3, 7, 62.0),  # Pharmacy to Ward B (via hallway)
+        (4, 8, 62.0),  # Lab to Surgery (via hallway)
+        (5, 6, 62.0),  # Cafeteria to Ward A (via hallway)
+        (6, 7, 62.0),  # Ward A to Ward B (via hallway)
+        (7, 8, 62.0),  # Ward B to Surgery (via hallway)
+        # Additional pathways connecting new locations
+        (1, 19, 31.0),  # ER to Radiology
+        (19, 2, 31.0),  # Radiology to ICU
+        (2, 20, 31.0),  # ICU to Physical Therapy
+        (20, 3, 31.0),  # Physical Therapy to Pharmacy
+        (3, 21, 31.0),  # Pharmacy to Cardiology
+        (21, 4, 31.0),  # Cardiology to Lab
+        (5, 22, 31.0),  # Cafeteria to Oncology
+        (22, 6, 31.0),  # Oncology to Ward A
+        (6, 23, 31.0),  # Ward A to Orthopedics
+        (23, 7, 31.0),  # Orthopedics to Ward B
+        (7, 24, 31.0),  # Ward B to Neurology
+        (24, 8, 31.0),  # Neurology to Surgery
+        # Cross-connections for more routing options
+        (19, 22, 31.0),  # Radiology to Oncology
+        (20, 23, 31.0),  # Physical Therapy to Orthopedics
+        (21, 24, 31.0),  # Cardiology to Neurology
     ]
     charging_pathways = [
-        # Horizontal pathways with charging stations
-        (1, 9, 5.0), (9, 2, 5.0),    # ER -> CS1-2 -> ICU
-        (2, 10, 5.0), (10, 3, 5.0),  # ICU -> CS2-3 -> Pharmacy
-        (3, 11, 5.0), (11, 4, 5.0),  # pharmancy -> CS3-4 -> Lab
-        # vertical pathways with charging stations
-        (1, 12, 5.0), (12, 5, 5.0),  # ER -> CS1-5 -> Cafeteria
-        (2, 13, 5.0), (13, 6, 5.0),  # ICU -> CS2-6 -> Ward A
-        (3, 14, 5.0), (14, 7, 5.0),  # Pharmacy -> CS3-7 -> Ward B
-        (4, 15, 5.0), (15, 8, 5.0),  # Lab -> CS4-8 -> Surgery
-        # bottom row pathways with charging stations
-        (5, 16, 5.0), (16, 6, 5.0),  # Cafeteria -> CS5-6 -> Ward A
-        (6, 17, 5.0), (17, 7, 5.0),  # Ward A -> CS6-7 -> Ward B
-        (7, 18, 5.0), (18, 8, 5.0),  # Ward B -> CS7-8 -> Surgery
+        # Horizontal pathways with charging stations (hallways)
+        (1, 9, 31.0), (9, 2, 31.0),    # ER -> CS1-2 -> ICU (hallway)
+        (2, 10, 31.0), (10, 3, 31.0),  # ICU -> CS2-3 -> Pharmacy (hallway)
+        (3, 11, 31.0), (11, 4, 31.0),  # pharmancy -> CS3-4 -> Lab (hallway)
+        # vertical pathways with charging stations (hallways)
+        (1, 12, 30.0), (12, 5, 30.0),  # ER -> CS1-5 -> Cafeteria (hallway)
+        (2, 13, 31.0), (13, 6, 31.0),  # ICU -> CS2-6 -> Ward A (hallway)
+        (3, 14, 31.0), (14, 7, 31.0),  # Pharmacy -> CS3-7 -> Ward B (hallway)
+        (4, 15, 30.0), (15, 8, 30.0),  # Lab -> CS4-8 -> Surgery (hallway)
+        # bottom row pathways with charging stations (hallways)
+        (5, 16, 31.0), (16, 6, 31.0),  # Cafeteria -> CS5-6 -> Ward A (hallway)
+        (6, 17, 31.0), (17, 7, 31.0),  # Ward A -> CS6-7 -> Ward B (hallway)
+        (7, 18, 31.0), (18, 8, 31.0),  # Ward B -> CS7-8 -> Surgery (hallway)
     ]
     # add all pathways (original + charging station pathways)
     for from_id, to_id, weight in pathways:
@@ -76,27 +107,39 @@ def initialize_hospital_system() -> DroneAssignmentService:
     # set charging station locations (all charging station IDs)
     charging_station_ids = [loc.id for loc in charging_stations]
     service.CHARGING_STATION_LOCATIONS = charging_station_ids
-    # emergency drones: Start at charging stations near emergency locations
+    # Find leftmost and rightmost nodes (for drone starting positions)
+    # Leftmost: Location 1 (ER) at x=0, y=0
+    # Rightmost: Location 4 (Lab) at x=186, y=0
+    leftmost_location_id = 1  # Emergency Room (x=0)
+    rightmost_location_id = 4  # Lab (x=186)
+    
+    # emergency drones: Half at leftmost node, half at rightmost node
     emergency_drone_count = 6
     for i in range(emergency_drone_count):
-        # distribute emergency drones across charging stations near emergency areas (locations 1-2)
-        charging_station_id = charging_station_ids[i % len(charging_station_ids)]
-        service.add_drone(charging_station_id, emergency_drone=True)
-        # mark drone as available and at charging station
+        # First half at leftmost, second half at rightmost
+        if i < emergency_drone_count // 2:
+            start_location_id = leftmost_location_id
+        else:
+            start_location_id = rightmost_location_id
+        service.add_drone(start_location_id, emergency_drone=True)
+        # mark drone as available
         drone = service.drones[service.next_drone_id - 1]
         drone.status = "available"
-        drone.is_charging = False  # Available at charging station but not currently charging
+        drone.is_charging = False  # Not at charging station, just available
         drone.battery_level_kwh = drone.battery_capacity_kwh * 0.8  # Start at 80% charge
-    # normal drones: Start at charging stations (for regular requests)
+    # normal drones: Half at leftmost node, half at rightmost node
     normal_drone_count = 14
     for i in range(normal_drone_count):
-        # distribute normal drones across all charging stations
-        charging_station_id = charging_station_ids[(i + emergency_drone_count) % len(charging_station_ids)]
-        service.add_drone(charging_station_id, emergency_drone=False)
-        # mark drone as available and at charging station
+        # First half at leftmost, second half at rightmost
+        if i < normal_drone_count // 2:
+            start_location_id = leftmost_location_id
+        else:
+            start_location_id = rightmost_location_id
+        service.add_drone(start_location_id, emergency_drone=False)
+        # mark drone as available
         drone = service.drones[service.next_drone_id - 1]
         drone.status = "available"
-        drone.is_charging = False  # Available at charging station but not currently charging
+        drone.is_charging = False  # Not at charging station, just available
         drone.battery_level_kwh = drone.battery_capacity_kwh * 0.8  # Start at 80% charge
     # total: 6 emergency drones + 14 normal drones = 20 drones
     return service

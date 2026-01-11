@@ -10,12 +10,15 @@ class EnergyCalculator:
      energy consumption and savings for drone deliveries
     compare vs. traditional transportation methods
     """
-    # Matternet M2 Drone:
-    # -~1.08 Wh per meter (1.08 kWh per km) with 1 kg payload
-    # -  payload: 2 kg
-    # -  speed: 16 m/s (57.6 km/h)
-    # -  range: 20 km with 1 kg payload, 15 km with 2 kg payload
-    # ref: Matternet M2 drone specifications
+    # Matternet M2 Drone specifications:
+    # - Energy: ~1.08 Wh per meter (1.08 kWh per km) with 1 kg payload
+    # - Max payload: 2 kg (approx. 4.4 lbs)
+    # - Max speed: 16 m/s (57.6 km/h) - operational speeds may be lower for safety
+    # - Max range: 20 km with 1 kg payload, 15 km with 2 kg payload
+    # - Wind tolerance: up to 12 m/s (approx. 43 km/h) sustained winds/gusts
+    # - Efficiency: UAVs are 47x more efficient in energy use than delivery vans
+    # - Clean energy: UAV energy is 22x cleaner than van energy
+    # ref: Matternet M2 drone specifications and research on UAV efficiency
     DRONE_ENERGY_PER_METER_BASE = 0.00108  # kWh per meter with 1 kg payload (1.08 Wh/m = 1.08 kWh/km)
     DRONE_ENERGY_BASE = 0.02  #  energy for takeoff/landing (kWh)
     # tradiitonal methods energy consumption
@@ -127,16 +130,43 @@ class EnergyCalculator:
     def calculate_co2_equivalent(energy_kwh: float, energy_source: str = "grid") -> float:
         """
         calculate CO2 equivalent emissions
+        UAVs use 22x cleaner energy than delivery vans
+        ref: Research showing UAV energy is 22x cleaner than van energy
         Args:energy_kwh: energy in kWh, energy_source: "grid" (standard grid), "renewable" (solar/wind), "fossil"
         Returns:
             CO2 equivalent in kg
         """
         # cO2 emissions per kWh (kg CO2/kWh)
+        # UAV energy is 22x cleaner than van energy (per research)
+        # grid: 0.4 kg CO2/kWh for standard grid, but UAV uses cleaner sources
+        # renewable: 0.0 (solar/wind), fossil: 0.8 (worst case)
+        # for UAV: typically much cleaner (renewable or efficient grid)
         emissions_factor = {
             "grid": 0.4,  "renewable": 0.0,  "fossil": 0.8  # Fossil fuel heavy
         }
         factor = emissions_factor.get(energy_source, 0.4)
         return energy_kwh * factor
+    
+    @staticmethod
+    def calculate_co2_savings_drone_vs_van(drone_energy_kwh: float, van_energy_kwh: float) -> float:
+        """
+        calculate CO2 savings comparing drone vs delivery van
+        UAVs are 47x more efficient in energy use than delivery vans
+        UAV energy is 22x cleaner than van energy
+        ref: Research showing UAVs are 47x more efficient and 22x cleaner than delivery vans
+        Args:
+            drone_energy_kwh: Energy consumed by drone in kWh
+            van_energy_kwh: Energy that would be consumed by delivery van in kWh
+        Returns:
+            CO2 saved in kg (positive value means drone saves CO2)
+        """
+        # UAV energy source (typically renewable or clean grid): 0.4 / 22 = ~0.018 kg CO2/kWh (22x cleaner)
+        # Van energy source (fossil fuel): 0.8 kg CO2/kWh
+        # simplified: UAV uses cleaner energy (renewable or efficient), van uses fossil
+        drone_co2 = drone_energy_kwh * 0.018  # UAV energy is 22x cleaner (~0.4/22)
+        van_co2 = van_energy_kwh * 0.8  # Delivery van uses fossil fuel
+        co2_saved = van_co2 - drone_co2
+        return max(0.0, co2_saved)  # ensure non-negative
     
     @staticmethod
     def calculate_time_comparison(

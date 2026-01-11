@@ -47,6 +47,8 @@ class DronePosition:
     timestamp: float = 0.0  # when drone will be at this position
     is_emergency: bool = False
     speed: float = 2.5  # curr speed
+    lane: int = 1  # lane assignment: 0=left, 1=middle, 2=right (default middle for emergency)
+    priority_level: int = 3  # CTAS priority level (1-5, higher = more urgent)
 class RRTPathPlanner:
     """
     RRT* (RRT-Star) path planner for collision-free drone navigation.
@@ -57,18 +59,21 @@ class RRTPathPlanner:
         self,
         graph: HospitalGraph,
         search_space_bounds: List[Tuple[float, float]],
-        obstacle_radius: float = 1.5  # safety radius around drones/locations (meters)
+        obstacle_radius: float = 1.5,  # safety radius around drones/locations (meters)
+        lane_width: float = 1.0  # width of each lane (meters) - 3 lanes = 3m total hallway width
     ):
         """
-         RRT path planner
+         RRT path planner with 3-lane system
         Args:
             graph: hospital graph for node-based path planning
             search_space_bounds: bounds for each dimension [(x_min, x_max), (y_min, y_max), ...]
             obstacle_radius: safety radius around obstacles (default 1.5m)
+            lane_width: width of each lane (default 1.0m) - 3 lanes allow 3 drones side-by-side
         """
         self.graph = graph
         self.search_space_bounds = search_space_bounds
         self.obstacle_radius = obstacle_radius
+        self.lane_width = lane_width  # 1m per lane, 3 lanes = 3m total hallway width
         # dynamic obstacles (other drones in flight)
         self.dynamic_obstacles: Dict[int, List[DronePosition]] = {}  # drone_id -> trajectory
         
@@ -92,13 +97,86 @@ class RRTPathPlanner:
     def _point_from_location(self, loc: Location, z: float = 0.0) -> Tuple[float, float, float]:
         """conv Location to 3D point"""
         return (loc.x, loc.y, z)
+    
+    def _assign_lane_for_drone(self, is_emergency: bool, priority_level: int = 3, other_drones_in_pathway: List[DronePosition] = None) -> int:
+        """
+        Assign lane based on priority for 3-lane system
+        
+        Rules:
+        - Emergency/high priority (CTAS I/II, priority_level >= 4): Get middle lane (1) or any available lane
+        - Normal/low priority (CTAS III/IV/V, priority_level <= 3): Get left (0) or right (2) lane, avoid middle
+        - Lower priority drones must yield to higher priority ones
+        
+        Args:
+            is_emergency: True if emergency drone
+            priority_level: CTAS priority level (1-5, higher = more urgent)
+            other_drones_in_pathway: Other drones in the same pathway segment (for lane conflict checking)
+        
+        Returns:
+            Lane assignment: 0=left, 1=middle, 2=right
+        """
+        if other_drones_in_pathway is None:
+            other_drones_in_pathway = []
+        
+        is_high_priority = is_emergency or priority_level >= 4
+        
+        if is_high_priority:
+            # Emergency/high priority: Prefer middle lane (1), but can use any lane
+            occupied_lanes = {pos.lane for pos in other_drones_in_pathway if hasattr(pos, 'lane') and pos.lane is not None}
+            # If middle lane available, use it
+            if 1 not in occupied_lanes:
+                return 1
+            # Otherwise use any available lane
+            available_lanes = {0, 1, 2} - occupied_lanes
+            if available_lanes:
+                return min(available_lanes)  # Prefer left if multiple available
+            # All lanes occupied by lower priority - emergency gets priority (will yield others)
+            return 1  # Force middle lane (lower priority drones must yield)
+        else:
+            # Normal/low priority: Use left (0) or right (2), avoid middle
+            occupied_lanes = {pos.lane for pos in other_drones_in_pathway if hasattr(pos, 'lane') and pos.lane is not None}
+            # Check if any high-priority drones are in middle lane
+            high_priority_in_middle = any(
+                hasattr(pos, 'lane') and pos.lane == 1 and (pos.is_emergency or (hasattr(pos, 'priority_level') and pos.priority_level >= 4))
+                for pos in other_drones_in_pathway
+            )
+            # Prefer left lane, then right lane
+            if 0 not in occupied_lanes:
+                return 0
+            elif 2 not in occupied_lanes:
+                return 2
+            # Both side lanes occupied - check if we can use middle (only if no high-priority)
+            if not high_priority_in_middle and 1 not in occupied_lanes:
+                return 1
+            # All lanes have conflicts - use left as default (lower priority must yield)
+            return 0
+    
+    def _get_lane_offset(self, lane: int) -> Tuple[float, float]:
+        """
+        Get x,y offset for a given lane relative to pathway center
+        
+        Args:
+            lane: Lane number (0=left, 1=middle, 2=right)
+        
+        Returns:
+            (dx, dy) offset in meters (perpendicular to pathway direction)
+        """
+        # For simplicity, offset perpendicular to pathway
+        # Left lane: -lane_width, Middle: 0, Right: +lane_width
+        offset = (lane - 1) * self.lane_width  # -1.0, 0.0, +1.0
+        # This will be applied perpendicular to the pathway direction
+        return (offset, 0.0)  # Simplified - would need pathway direction for proper offset
+    
     def _is_collision_free(
         self,
         point: Tuple[float, float, float], other_drones: Dict[int, List[DronePosition]],
-        current_drone_id: int,is_emergency: bool, timestamp: float = 0.0,current_speed: float = 2.5
+        current_drone_id: int, is_emergency: bool, timestamp: float = 0.0, current_speed: float = 2.5,
+        current_lane: int = 1, current_priority_level: int = 3
     ) -> bool:
         """
-        use with algos from:
+        Check collision with 3-lane system support
+        
+        Uses algorithms from:
         - Nayak, A., Rathinam, S., & Gopalswamy, S. (2020). Response of Autonomous Vehicles 
           to Emergency Response Vehicles (RAVEV). SAFE-D: Safety Through Disruption National 
           University Transportation Center. https://trid.trb.org/View/1717034
@@ -106,29 +184,33 @@ class RRTPathPlanner:
           https://github.com/Aparajit-Garg/Self-Driving-Car
         - Gaochengzhi (Emergency_Traffic_Simulation). Emergency vehicle traffic simulation.
           https://github.com/Gaochengzhi/Emergency_Traffic_Simulation
-        args:
+        
+        Args:
             point: 3D point to check
             other_drones: Dictionary of other drones' positions
             current_drone_id: ID of drone planning this path
             is_emergency: True if current drone is emergency (has right of way)
             timestamp: Time at which point will be reached
             current_speed: Current speed of the planning drone (m/s)
-        returns:
+            current_lane: Lane assignment for current drone (0=left, 1=middle, 2=right)
+            current_priority_level: CTAS priority level for current drone (1-5)
+        
+        Returns:
             True if point is safe, False if collision detected
         """
-        # check collisions with other drones
+        # Check collisions with other drones in 3-lane system
         for drone_id, trajectory in other_drones.items():
             if drone_id == current_drone_id:
                 continue
             for i, other_pos in enumerate(trajectory):
-                # calc time-to-collision for predictive avoidance
+                # Calculate time-to-collision for predictive avoidance
                 time_to_point = timestamp
                 time_delta = abs(time_to_point - other_pos.timestamp)
-                # make future position based on speed and direction
+                # Estimate future position based on speed and direction
                 predicted_pos = (other_pos.x, other_pos.y, other_pos.z)
                 if len(trajectory) > i + 1:
                     next_pos = trajectory[i + 1]
-                    # est future position based on velocity
+                    # Estimate future position based on velocity
                     if time_delta > 0:
                         progress = min(1.0, time_delta / max(0.1, abs(next_pos.timestamp - other_pos.timestamp)))
                         predicted_pos = (
@@ -136,32 +218,58 @@ class RRTPathPlanner:
                             other_pos.y + (next_pos.y - other_pos.y) * progress,
                             other_pos.z + (next_pos.z - other_pos.z) * progress
                         )
-                # emergency vehicle yielding protocol (RAVEV-inspired)
-                if other_pos.is_emergency and not is_emergency:
-                    # emergency vehicles get larger safety margin and priority
-                    # normal drones must stop by maintaining larger distance
+                
+                # 3-lane system: Check if drones are in the same or conflicting lanes
+                other_lane = getattr(other_pos, 'lane', 1)  # Default to middle if not set
+                other_priority = getattr(other_pos, 'priority_level', 3)
+                other_is_emergency = other_pos.is_emergency
+                
+                # Same lane: stricter collision check
+                if current_lane == other_lane:
+                    dist = self._distance(point, predicted_pos)
+                    # In same lane, need more separation (at least 1 lane width)
+                    if dist < self.lane_width * 1.5:  # 1.5× lane width for same-lane safety
+                        # Lower priority must yield to higher priority
+                        if (not is_emergency and current_priority_level < 4) and \
+                           (other_is_emergency or other_priority >= 4):
+                            return False  # Lower priority must yield
+                        elif (is_emergency or current_priority_level >= 4) and \
+                             (not other_is_emergency and other_priority < 4):
+                            # Higher priority can pass, but still need minimum separation
+                            if dist < self.lane_width * 0.8:
+                                return False
+                        else:
+                            # Same priority level - both must maintain distance
+                            if dist < self.lane_width * 1.5:
+                                return False
+                else:
+                    # Different lanes: standard collision check (still need some separation)
+                    dist = self._distance(point, predicted_pos)
+                    if dist < self.obstacle_radius:
+                        return False
+                
+                # Emergency vehicle yielding protocol (RAVEV-inspired)
+                if other_is_emergency and not is_emergency and current_priority_level < 4:
+                    # Emergency vehicles get larger safety margin and priority
+                    # Normal drones must yield by maintaining larger distance
                     dist = self._distance(point, predicted_pos)
                     emergency_safety_radius = self.obstacle_radius * 3.0  # 3x safety margin for emergency
-                    #  avoidance: check if we'll be in emergency vehicle's path
+                    # Collision avoidance: check if we'll be in emergency vehicle's path
                     if dist < emergency_safety_radius:
                         return False
-                    #  check: if emergency vehicle is moving towards us
-                    # (simplified: if emergency is faster and approaching, yield more)
+                    # Predictive check: if emergency vehicle is moving towards us
                     if other_pos.speed > current_speed and dist < emergency_safety_radius * 1.5:
                         return False
-                    # time-to-collision check: yield if collision predicted within safety time
+                    # Time-to-collision check: yield if collision predicted within safety time
                     relative_speed = abs(other_pos.speed - current_speed)
                     if relative_speed > 0:
                         time_to_collision = dist / relative_speed
                         if 0 < time_to_collision < 5.0:  # Yield if collision within 5 seconds
                             return False
-                #  collision check with predictive positioning
-                dist = self._distance(point, predicted_pos)
-                if dist < self.obstacle_radius:
-                    return False
-                #  safety check: avoid path segments that cross emergency vehicle trajectories
-                if other_pos.is_emergency and not is_emergency:
-                    # if emergency vehicle is ahead and moving in similar direction, maintain distance
+                # Additional safety check: avoid path segments that cross emergency vehicle trajectories
+                if other_is_emergency and not is_emergency and current_priority_level < 4:
+                    dist = self._distance(point, predicted_pos)
+                    # If emergency vehicle is ahead and moving in similar direction, maintain distance
                     if dist < self.obstacle_radius * 2.5:
                         return False
         return True
@@ -222,7 +330,8 @@ class RRTPathPlanner:
         other_drones: Dict[int, List[DronePosition]],
         max_iterations: int = 500,
         step_size: float = 2.0,
-        goal_radius: float = 3.0
+        goal_radius: float = 3.0,
+        current_priority_level: int = 3  # CTAS priority level (1-5)
     ) -> Optional[List[int]]:
         """
         algo based on:
@@ -310,9 +419,12 @@ class RRTPathPlanner:
                 new_cost = cost[new_point] + self._distance(near_point, new_point)
                 if cost.get(near_point, float('inf')) > new_cost:
                     # check if rewiring creates collision-free path (with emergency vehicle awareness)
+                    # Use same lane assignment logic for rewiring
+                    rewiring_lane = 1 if (is_emergency or current_priority_level >= 4) else 0
                     if self._is_collision_free(
                         near_point, other_drones, current_drone_id, is_emergency, 
-                        timestamp=i * 0.1, current_speed=current_speed
+                        timestamp=i * 0.1, current_speed=current_speed,
+                        current_lane=rewiring_lane, current_priority_level=current_priority_level
                     ):
                         parent[near_point] = new_point
                         cost[near_point] = new_cost
@@ -354,7 +466,8 @@ class RRTPathPlanner:
     
     def plan_path_with_traffic_rules(
         self,start_loc: Location, goal_loc: Location,
-        current_drone_id: int, is_emergency: bool,active_drone_flights: Dict[int, dict], all_drones: Dict[int, 'Drone']  # type: ignore
+        current_drone_id: int, is_emergency: bool,active_drone_flights: Dict[int, dict], all_drones: Dict[int, 'Drone'],  # type: ignore
+        current_priority_level: int = 3  # CTAS priority level (1-5, higher = more urgent)
     ) -> List[int]:
         """
          path with traffic rules and collision avoidance.
@@ -413,6 +526,12 @@ class RRTPathPlanner:
                         dist = self.graph.euclidean_distance(prev_loc, loc)
                         current_time += dist / speed
                     is_emerg = drone.emergency_drone if drone else False
+                    # Get priority level from flight info or default based on emergency status
+                    other_priority_level = flight_info.get('priority_level', 5 if is_emerg else 3)
+                    # Assign lane based on priority (3-lane system)
+                    # Collect other drones in same pathway segment for lane assignment
+                    other_drones_in_segment = [p for traj in other_drone_positions.values() for p in traj if p.location_id == loc_id]
+                    assigned_lane = self._assign_lane_for_drone(is_emerg, other_priority_level, other_drones_in_segment)
                     positions.append(DronePosition(
                         drone_id=drone_id,
                         location_id=loc_id,
@@ -421,7 +540,9 @@ class RRTPathPlanner:
                         z=0.0,
                         timestamp=current_time,
                         is_emergency=is_emerg,
-                        speed=speed
+                        speed=speed,
+                        lane=assigned_lane,
+                        priority_level=other_priority_level
                     ))
             if positions:
                 other_drone_positions[drone_id] = positions

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hospital Drone Logistics - Real-Time Dashboard</title>
+    <link rel="stylesheet" href="/map.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -137,6 +138,52 @@
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
             margin-top: 15px;
+        }
+
+        .stat-tab-btn {
+            padding: 10px 20px;
+            margin-right: 10px;
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .stat-tab-btn:hover {
+            background: #e8e8e8;
+        }
+
+        .stat-tab-btn.active {
+            background: white;
+            border-bottom-color: white;
+            color: #667eea;
+            border-color: #667eea;
+        }
+
+        .time-range-btn {
+            padding: 6px 12px;
+            border: 2px solid #4CAF50;
+            background: white;
+            color: #4CAF50;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .time-range-btn:hover {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .time-range-btn.active {
+            background: #4CAF50;
+            color: white;
         }
 
         .stat-item {
@@ -997,7 +1044,7 @@
         }
 
         #floor-plan-container {
-            display: none;
+            display: flex !important;
             flex-direction: column;
             width: 100%;
             height: 100%;
@@ -1116,7 +1163,7 @@
                 <form id="completeForm" class="request-form">
                     <div class="form-group">
                         <label>Final Location ID (where drone ends up)</label>
-                        <input type="number" id="finalLocationId" placeholder="1-8" min="1" max="8" required>
+                        <input type="number" id="finalLocationId" placeholder="1-8, 19-24" min="1" max="28" required>
                     </div>
                     <div class="form-group">
                         <label>Payload Weight (kg)</label>
@@ -1160,25 +1207,35 @@
         <!-- Map and Request Form Side by Side -->
         <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; align-items: start;">
             <!-- Hospital Map Visualization -->
-            <div class="card map-container" style="display: flex; flex-direction: column; height: 100%; min-height: 650px;">
-                <h2>Hospital Map & Drone Tracker</h2>
-                <div id="tracker-controls"></div>
-                <div id="canvas-container" style="display: flex; flex: 1; min-height: 500px; height: 500px; width: 100%; position: relative;">
-                    <canvas id="three-canvas" width="800" height="500" style="width: 100%; height: 100%; display: block; background-color: #f0f0f0;"></canvas>
+            <div class="card" style="padding: 20px;">
+                <h2 style="margin: 0 0 15px 0;">Hospital Map & Drone Tracker</h2>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button onclick="switchFloorMap(1)" id="btn-floor1" style="padding: 10px 20px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Floor 1</button>
+                    <button onclick="switchFloorMap(2)" id="btn-floor2" style="padding: 10px 20px; background-color: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Floor 2</button>
                 </div>
-                <div id="floor-plan-container" style="display: none; flex-direction: column; flex: 1; min-height: 500px; height: 500px;">
-                    <div id="floor-title">Floor 1 - Main Hospital Floor</div>
-                    <svg id="floor-svg" viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg" style="flex: 1; min-height: 450px; height: 450px;"></svg>
+                
+                <div style="background: white; border: 2px solid #ddd; border-radius: 5px; padding: 20px; min-height: 500px; text-align: center;">
+                    <img id="img-floor" src="/image.png" alt="Floor Plan" style="max-width: 100%; height: auto;">
                 </div>
-                <div id="drone-info">
-                    <span id="close-drone-info">&times;</span>
-                    <h4>Drone Information</h4>
-                    <div class="info-item"><strong>Name:</strong> <span id="drone-name"></span></div>
-                    <div class="info-item"><strong>ID:</strong> <span id="drone-id"></span></div>
-                    <div class="info-item"><strong>Floor:</strong> <span id="drone-floor"></span></div>
-                    <div class="info-item"><strong>Status:</strong> <span id="drone-status"></span></div>
-                    <div class="info-item"><strong>Position:</strong> <span id="drone-position"></span></div>
-                </div>
+                
+                <script>
+                    function switchFloorMap(floor) {
+                        const img = document.getElementById('img-floor');
+                        const btn1 = document.getElementById('btn-floor1');
+                        const btn2 = document.getElementById('btn-floor2');
+                        
+                        if (floor === 1) {
+                            img.src = '/image.png';
+                            btn1.style.backgroundColor = '#3498db';
+                            btn2.style.backgroundColor = '#95a5a6';
+                        } else {
+                            img.src = '/image2.png';
+                            btn1.style.backgroundColor = '#95a5a6';
+                            btn2.style.backgroundColor = '#3498db';
+                        }
+                    }
+                </script>
             </div>
 
             <!-- Create Request Form -->
@@ -1195,7 +1252,7 @@
                     </div>
                     <div class="form-group">
                         <label>Requester Location ID <small>(Click a location on the map to select)</small></label>
-                        <input type="number" id="requesterLocationId" placeholder="1-8" min="1" max="8" required>
+                        <input type="number" id="requesterLocationId" placeholder="1-8, 19-24" min="1" max="28" required>
                         <small style="color: #666; display: block; margin-top: 5px;">
                             Click any location on the map (left side) to automatically fill this field
                         </small>
@@ -1258,13 +1315,13 @@
                     <div class="form-group">
                         <label> Select Items to Deliver</label>
                         <small style="color: #666; display: block; margin-bottom: 10px;">
-                            Maximum payload capacity: <strong id="maxPayloadCapacity">1.5</strong> kg (Matternet-style small delivery drone)
+                            Maximum payload capacity: <strong id="maxPayloadCapacity">2.0</strong> kg (Matternet M2 drone)
                         </small>
                         <div id="itemsContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
                             <div class="loading">Loading items...</div>
                         </div>
                         <div id="payloadSummary" class="payload-summary" style="display: none;">
-                            <strong>Total Weight: <span id="totalWeight">0.00</span> kg / <span id="maxCapacity">1.5</span> kg</strong>
+                            <strong>Total Weight: <span id="totalWeight">0.00</span> kg / <span id="maxCapacity">2.0</span> kg</strong>
                             <span id="capacityStatus" style="margin-left: 10px; display: block; margin-top: 5px;"></span>
                         </div>
                     </div>
@@ -1341,20 +1398,190 @@
         </div>
 
         <!-- System Statistics and Energy Savings -->
-        <div class="grid">
-            <!-- Statistics Card -->
-            <div class="card">
-                <h2>System Statistics</h2>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
-                    <strong>🚨 Emergency drones</strong> handle CTAS I & II (Resuscitation & Emergent)<br>
-                    <strong> Normal drones</strong> handle CTAS III, IV & V (Urgent, Less-urgent, Non-urgent)<br>
-                    <small>Using Canadian Triage and Acuity Scale (CTAS) - CMS-ES-02-2017</small>
-                </p>
-                <div class="stat-grid" id="statistics">
-                    <div class="loading">Loading statistics...</div>
+        <div class="card full-width" style="margin-top: 30px;">
+            <h2>System Statistics</h2>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                <strong>🚨 Emergency drones</strong> handle CTAS I & II (Resuscitation & Emergent)<br>
+                <strong> Normal drones</strong> handle CTAS III, IV & V (Urgent, Less-urgent, Non-urgent)<br>
+                <small>Using Canadian Triage and Acuity Scale (CTAS) - CMS-ES-02-2017</small>
+            </p>
+            <div id="totalDronesDisplay" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; display: flex; gap: 30px; align-items: center; justify-content: flex-start;">
+                <div>
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Total</div>
+                    <div style="font-size: 2em; font-weight: bold; color: #667eea;" id="totalDronesValue">0</div>
+                </div>
+                <div style="border-left: 2px solid #ddd; padding-left: 30px;">
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Emergency</div>
+                    <div style="font-size: 2em; font-weight: bold; color: #f44336;" id="emergencyDronesValue">0</div>
+                </div>
+                <div style="border-left: 2px solid #ddd; padding-left: 30px;">
+                    <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">Normal</div>
+                    <div style="font-size: 2em; font-weight: bold; color: #2196F3;" id="normalDronesValue">0</div>
                 </div>
             </div>
+            <div style="margin-bottom: 15px;">
+                <button class="stat-tab-btn active" onclick="switchStatTab('available')" id="tab-available">Available</button>
+                <button class="stat-tab-btn" onclick="switchStatTab('others')" id="tab-others">Others</button>
+            </div>
+            <div class="stat-grid" id="statistics">
+                <div class="loading">Loading statistics...</div>
+            </div>
+        </div>
 
+        <!-- Total Environmental Impact Analysis -->
+        <div class="card full-width">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2 style="margin: 0;">Total Environmental Impact Analysis</h2>
+                    <p style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                        Cumulative environmental impact from all drone deliveries. Data updates in real-time as requests are completed.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="time-range-btn active" onclick="setEnvironmentalTimeRange('all')" id="envTimeRange-all">All Time</button>
+                    <button class="time-range-btn" onclick="setEnvironmentalTimeRange('day')" id="envTimeRange-day">Last Day</button>
+                    <button class="time-range-btn" onclick="setEnvironmentalTimeRange('week')" id="envTimeRange-week">Last Week</button>
+                    <button class="time-range-btn" onclick="setEnvironmentalTimeRange('month')" id="envTimeRange-month">Last Month</button>
+                    <button class="time-range-btn" onclick="setEnvironmentalTimeRange('6months')" id="envTimeRange-6months">Last 6 Months</button>
+                </div>
+            </div>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h3 style="margin-bottom: 15px; color: #333;">Cumulative Energy Saved</h3>
+                    <div style="position: relative; height: 300px;">
+                        <canvas id="energyChart"></canvas>
+                    </div>
+                    <div id="energyStats" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>Total Energy Saved:</strong></span>
+                            <span id="totalEnergyValue" style="font-size: 1.2em; color: #4CAF50; font-weight: bold;">0.0000 kWh</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <span><strong>Average per Trip:</strong></span>
+                            <span id="avgEnergyValue" style="color: #666;">0.0000 kWh</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h3 style="margin-bottom: 15px; color: #333;">Cumulative CO₂ Saved</h3>
+                    <div style="position: relative; height: 300px;">
+                        <canvas id="co2Chart"></canvas>
+                    </div>
+                    <div id="co2Stats" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>Total CO₂ Saved:</strong></span>
+                            <span id="totalCo2Value" style="font-size: 1.2em; color: #2196F3; font-weight: bold;">0.0000 kg</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <span><strong>Trips with Data:</strong></span>
+                            <span id="tripsCount" style="color: #666;">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Path Efficiency Comparison -->
+        <div class="card full-width">
+            <h2>Path Efficiency Comparison</h2>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 20px;">
+                Comparison of actual drone paths (using RRT+Dijkstra together) vs the next quickest alternative path. 
+                Drones use Dijkstra to find the shortest path, then RRT for collision avoidance, so both algorithms work together.
+                Shows time savings and efficiency gains.
+            </p>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h3 style="margin-bottom: 15px; color: #333;">Path Time Comparison</h3>
+                    <div style="position: relative; height: 300px;">
+                        <canvas id="pathComparisonChart"></canvas>
+                    </div>
+                    <div id="pathStats" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><strong>Average Time Saved:</strong></span>
+                            <span id="avgTimeSaved" style="font-size: 1.2em; color: #4CAF50; font-weight: bold;">0.00 s</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <span><strong>Total Time Saved:</strong></span>
+                            <span id="totalTimeSaved" style="color: #666;">0.00 s</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <span><strong>Average Efficiency:</strong></span>
+                            <span id="avgEfficiency" style="color: #666;">0.00%</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h3 style="margin-bottom: 15px; color: #333;">Path Visualization</h3>
+                    <div id="pathVisualization" style="height: 300px; background: #f8f9fa; border: 2px solid #ddd; border-radius: 5px; position: relative; display: flex; align-items: center; justify-content: center;">
+                        <div style="text-align: center; color: #999;">
+                            <p style="font-size: 1.1em; margin-bottom: 10px;">Select a completed request</p>
+                            <p style="font-size: 0.9em;">to view its chosen path</p>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <div style="width: 20px; height: 3px; background: #4CAF50;"></div>
+                                <span style="font-size: 0.9em;">Chosen Path (RRT)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <div style="width: 20px; height: 3px; background: #FF9800; border-style: dashed;"></div>
+                                <span style="font-size: 0.9em;">Next Quickest Path</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <div style="width: 12px; height: 12px; background: #2196F3; border-radius: 50%;"></div>
+                                <span style="font-size: 0.9em;">Start</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <div style="width: 12px; height: 12px; background: #f44336; border-radius: 50%;"></div>
+                                <span style="font-size: 0.9em;">End</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-Drone Traffic Visualization -->
+        <div class="card full-width">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2 style="margin: 0;">Multi-Drone Traffic System</h2>
+                    <p style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                        View all active drones with priority system (emergency vs normal) and 3-lane traffic system.
+                        Emergency/high-priority drones (red/orange) use middle lane, normal/low-priority drones (blue) use left/right lanes.
+                    </p>
+                </div>
+            </div>
+            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h3 style="margin-bottom: 15px; color: #333;">Traffic Visualization</h3>
+                <div id="multiDroneVisualization" style="height: 500px; background: #f8f9fa; border: 2px solid #ddd; border-radius: 5px; position: relative; overflow: hidden;">
+                    <div style="text-align: center; color: #999; padding-top: 200px;">
+                        <p style="font-size: 1.1em; margin-bottom: 10px;">Loading traffic visualization...</p>
+                        <p style="font-size: 0.9em;">Graph structure will be displayed here</p>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 20px; height: 20px; background: #f44336; border-radius: 50%; border: 2px solid #fff;"></div>
+                            <span style="font-size: 0.9em;">Emergency/High Priority (Middle Lane)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 20px; height: 20px; background: #2196F3; border-radius: 50%; border: 2px solid #fff;"></div>
+                            <span style="font-size: 0.9em;">Normal/Low Priority (Left/Right Lanes)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 40px; height: 3px; background: #ccc;"></div>
+                            <span style="font-size: 0.9em;">Hallway/Pathway</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 12px; height: 12px; background: #4CAF50; border-radius: 50%; border: 2px solid #fff;"></div>
+                            <span style="font-size: 0.9em;">Location Node</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -1365,6 +1592,27 @@
         let isInitialized = false;
         let currentCompletingRequestId = null;
         let isUpdating = false;
+        
+        // Environmental impact tracking
+        let environmentalHistory = {
+            timestamps: [],      // Display strings for labels
+            timestampsFull: [],  // Full Date objects for filtering
+            energySaved: [],
+            co2Saved: []
+        };
+        let energyChart = null;
+        let co2Chart = null;
+        let environmentalTimeRange = 'all'; // Current time range filter
+        
+        // Path efficiency tracking
+        let pathEfficiencyHistory = {
+            timestamps: [],
+            chosenTimes: [],
+            alternativeTimes: [],
+            timeSaved: []
+        };
+        let pathComparisonChart = null;
+        let selectedPathRequest = null;
 
         // Notification system
         function showNotification(message, type = 'info', duration = 3000) {
@@ -1406,7 +1654,7 @@
 
         // Item catalog and payload management
         let itemCatalog = null;
-        let maxPayloadCapacity = 1.5;
+        let maxPayloadCapacity = 2.0;
         let patientCatalog = [];
         let currentPatientVitalsData = null;
         let vitalsCharts = {}; // Store chart instances
@@ -2133,7 +2381,9 @@
                 await Promise.all([
                     updateStatistics(),
                     updateActiveRequests(),
-                    updateCompletedRequests()
+                    updateCompletedRequests(),
+                    updatePathEfficiency(),
+                    updateMultiDroneVisualization()
                 ]);
 
                 const indicator2 = document.querySelector('.refresh-indicator');
@@ -2146,6 +2396,17 @@
             }
         }
 
+        let currentStatTab = 'available';
+
+        function switchStatTab(tab) {
+            currentStatTab = tab;
+            document.querySelectorAll('.stat-tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            updateStatistics();
+        }
+
         async function updateStatistics() {
             try {
                 const response = await fetch(`${API_BASE}/statistics`);
@@ -2154,53 +2415,65 @@
                 }
                 const stats = await response.json();
 
-                const statsHtml = `
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.total_drones || 0}</div>
-                        <div class="stat-label">Total Drones</div>
-                    </div>
-                    <div class="stat-item" style="border-left: 4px solid #f44336;">
-                        <div class="stat-value" style="color: #f44336;">${stats.emergency_drones || 0}</div>
-                        <div class="stat-label">🚨 Emergency Drones</div>
-                    </div>
-                    <div class="stat-item" style="border-left: 4px solid #2196F3;">
-                        <div class="stat-value" style="color: #2196F3;">${stats.normal_drones || 0}</div>
-                        <div class="stat-label"> Normal Drones</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.available_drones || 0}</div>
-                        <div class="stat-label">Available (Total)</div>
-                    </div>
-                    <div class="stat-item" style="border-left: 4px solid #f44336;">
-                        <div class="stat-value" style="color: #f44336;">${stats.available_emergency_drones || 0}</div>
-                        <div class="stat-label">Available Emergency</div>
-                    </div>
-                    <div class="stat-item" style="border-left: 4px solid #2196F3;">
-                        <div class="stat-value" style="color: #2196F3;">${stats.available_normal_drones || 0}</div>
-                        <div class="stat-label">Available Normal</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.assigned_drones || 0}</div>
-                        <div class="stat-label">Assigned (Total)</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.total_requests || 0}</div>
-                        <div class="stat-label">Total Requests</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.pending_requests || 0}</div>
-                        <div class="stat-label">Pending</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.completed_requests || 0}</div>
-                        <div class="stat-label">Completed</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${stats.emergency_requests || 0}</div>
-                        <div class="stat-label">Emergency Requests</div>
-                    </div>
-                `;
+                // Update top display values
+                document.getElementById('totalDronesValue').textContent = stats.total_drones || 0;
+                document.getElementById('emergencyDronesValue').textContent = stats.emergency_drones || 0;
+                document.getElementById('normalDronesValue').textContent = stats.normal_drones || 0;
+                
+                let statsHtml = '';
+                
+                if (currentStatTab === 'available') {
+                    statsHtml = `
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.available_drones || 0}</div>
+                            <div class="stat-label">Available (Total)</div>
+                        </div>
+                        <div class="stat-item" style="border-left: 4px solid #f44336;">
+                            <div class="stat-value" style="color: #f44336;">${stats.available_emergency_drones || 0}</div>
+                            <div class="stat-label">Available Emergency</div>
+                        </div>
+                        <div class="stat-item" style="border-left: 4px solid #2196F3;">
+                            <div class="stat-value" style="color: #2196F3;">${stats.available_normal_drones || 0}</div>
+                            <div class="stat-label">Available Normal</div>
+                        </div>
+                    `;
+                } else {
+                    statsHtml = `
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.assigned_drones || 0}</div>
+                            <div class="stat-label">Assigned (Total)</div>
+                        </div>
+                        <div class="stat-item" style="border-left: 4px solid #f44336;">
+                            <div class="stat-value" style="color: #f44336;">${stats.assigned_emergency_drones || 0}</div>
+                            <div class="stat-label">Assigned Emergency</div>
+                        </div>
+                        <div class="stat-item" style="border-left: 4px solid #2196F3;">
+                            <div class="stat-value" style="color: #2196F3;">${stats.assigned_normal_drones || 0}</div>
+                            <div class="stat-label">Assigned Normal</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.total_requests || 0}</div>
+                            <div class="stat-label">Total Requests</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.pending_requests || 0}</div>
+                            <div class="stat-label">Pending</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.completed_requests || 0}</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.emergency_requests || 0}</div>
+                            <div class="stat-label">Emergency Requests</div>
+                        </div>
+                    `;
+                }
+                
                 document.getElementById('statistics').innerHTML = statsHtml;
+                
+                // Update environmental impact charts
+                updateEnvironmentalCharts(stats);
             } catch (error) {
                 console.error('Statistics update error:', error);
                 document.getElementById('statistics').innerHTML = `
@@ -2208,6 +2481,875 @@
                         <strong>Error loading statistics</strong><br>
                         <small>${error.message}</small>
                     </div>`;
+            }
+        }
+        
+        function updateEnvironmentalCharts(stats) {
+            const now = new Date();
+            const timeLabel = now.toLocaleTimeString();
+            
+            // Get current totals from stats
+            const currentEnergySaved = stats.total_energy_saved_kwh || 0;
+            const currentCo2Saved = stats.total_co2_saved_kg || 0;
+            
+            // For cumulative values, ensure they never decrease
+            // Use the maximum of current value or the last value in history (monotonic increase)
+            const lastEnergySaved = environmentalHistory.energySaved.length > 0 
+                ? environmentalHistory.energySaved[environmentalHistory.energySaved.length - 1] 
+                : 0;
+            const lastCo2Saved = environmentalHistory.co2Saved.length > 0 
+                ? environmentalHistory.co2Saved[environmentalHistory.co2Saved.length - 1] 
+                : 0;
+            
+            // Use maximum to ensure cumulative values never decrease
+            const energyToAdd = Math.max(currentEnergySaved, lastEnergySaved);
+            const co2ToAdd = Math.max(currentCo2Saved, lastCo2Saved);
+            
+            // Add data point to history (keep last 50 points for performance)
+            environmentalHistory.timestamps.push(timeLabel);
+            environmentalHistory.timestampsFull.push(now);
+            environmentalHistory.energySaved.push(energyToAdd);
+            environmentalHistory.co2Saved.push(co2ToAdd);
+            
+            // Keep only last 50 data points
+            const maxPoints = 50;
+            if (environmentalHistory.timestamps.length > maxPoints) {
+                environmentalHistory.timestamps.shift();
+                environmentalHistory.timestampsFull.shift();
+                environmentalHistory.energySaved.shift();
+                environmentalHistory.co2Saved.shift();
+            }
+            
+            // Update charts with filtered data
+            updateChartsWithTimeRange();
+            
+            // Update stats display
+            document.getElementById('totalEnergyValue').textContent = 
+                (stats.total_energy_saved_kwh || 0).toFixed(4) + ' kWh';
+            document.getElementById('avgEnergyValue').textContent = 
+                (stats.average_energy_saved_per_trip_kwh || 0).toFixed(4) + ' kWh';
+            document.getElementById('totalCo2Value').textContent = 
+                (stats.total_co2_saved_kg || 0).toFixed(4) + ' kg';
+            document.getElementById('tripsCount').textContent = 
+                (stats.trips_with_energy_data || 0);
+            
+            // Create or update energy chart (will use filtered data in updateChartsWithTimeRange)
+            const energyCtx = document.getElementById('energyChart');
+            if (!energyChart) {
+                const initialData = getFilteredEnvironmentalData();
+                energyChart = new Chart(energyCtx, {
+                    type: 'line',
+                    data: {
+                        labels: initialData.timestamps,
+                        datasets: [{
+                            label: 'Cumulative Energy Saved (kWh)',
+                            data: initialData.energySaved,
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Energy Saved (kWh)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(4);
+                                    }
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time'
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Create or update CO2 chart (will use filtered data in updateChartsWithTimeRange)
+            const co2Ctx = document.getElementById('co2Chart');
+            if (!co2Chart) {
+                const initialData = getFilteredEnvironmentalData();
+                co2Chart = new Chart(co2Ctx, {
+                    type: 'line',
+                    data: {
+                        labels: initialData.timestamps,
+                        datasets: [{
+                            label: 'Cumulative CO₂ Saved (kg)',
+                            data: initialData.co2Saved,
+                            borderColor: '#2196F3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'CO₂ Saved (kg)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(4);
+                                    }
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time'
+                                },
+                                ticks: {
+                                    maxRotation: 45,
+                                    minRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Update charts with filtered data if both charts exist
+            if (energyChart && co2Chart) {
+                updateChartsWithTimeRange();
+            }
+        }
+        
+        function getFilteredEnvironmentalData() {
+            if (!environmentalHistory.timestampsFull || environmentalHistory.timestampsFull.length === 0) {
+                return {
+                    timestamps: [],
+                    energySaved: [],
+                    co2Saved: []
+                };
+            }
+            
+            const now = new Date();
+            let cutoffDate = null;
+            
+            switch (environmentalTimeRange) {
+                case 'day':
+                    cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                    break;
+                case 'week':
+                    cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    break;
+                case 'month':
+                    cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    break;
+                case '6months':
+                    cutoffDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+                    break;
+                case 'all':
+                default:
+                    cutoffDate = null; // Show all data
+                    break;
+            }
+            
+            if (!cutoffDate) {
+                // Return all data
+                return {
+                    timestamps: environmentalHistory.timestamps,
+                    energySaved: environmentalHistory.energySaved,
+                    co2Saved: environmentalHistory.co2Saved
+                };
+            }
+            
+            // Filter data based on cutoff date
+            const filtered = {
+                timestamps: [],
+                energySaved: [],
+                co2Saved: []
+            };
+            
+            for (let i = 0; i < environmentalHistory.timestampsFull.length; i++) {
+                if (environmentalHistory.timestampsFull[i] >= cutoffDate) {
+                    filtered.timestamps.push(environmentalHistory.timestamps[i]);
+                    filtered.energySaved.push(environmentalHistory.energySaved[i]);
+                    filtered.co2Saved.push(environmentalHistory.co2Saved[i]);
+                }
+            }
+            
+            return filtered;
+        }
+        
+        function updateChartsWithTimeRange() {
+            const filtered = getFilteredEnvironmentalData();
+            
+            // Update energy chart
+            if (energyChart) {
+                energyChart.data.labels = filtered.timestamps;
+                energyChart.data.datasets[0].data = filtered.energySaved;
+                energyChart.update('none');
+            }
+            
+            // Update CO2 chart
+            if (co2Chart) {
+                co2Chart.data.labels = filtered.timestamps;
+                co2Chart.data.datasets[0].data = filtered.co2Saved;
+                co2Chart.update('none');
+            }
+        }
+        
+        function setEnvironmentalTimeRange(range) {
+            environmentalTimeRange = range;
+            
+            // Update button states
+            document.querySelectorAll('.time-range-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            const btn = document.getElementById(`envTimeRange-${range}`);
+            if (btn) btn.classList.add('active');
+            
+            // Update charts with filtered data
+            updateChartsWithTimeRange();
+        }
+        
+        async function updatePathEfficiency() {
+            try {
+                const response = await fetch(`${API_BASE}/statistics/path-efficiency`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                
+                // Always update stats display (even if no data)
+                const avgTimeSaved = (data.data && data.data.length > 0) ? (data.total_time_saved_seconds / data.trips_count || 0) : 0;
+                document.getElementById('avgTimeSaved').textContent = 
+                    avgTimeSaved.toFixed(2) + ' s';
+                document.getElementById('totalTimeSaved').textContent = 
+                    (data.total_time_saved_seconds || 0).toFixed(2) + ' s';
+                document.getElementById('avgEfficiency').textContent = 
+                    (data.average_efficiency_percentage || 0).toFixed(2) + '%';
+                
+                if (data.data && data.data.length > 0) {
+                    // Prepare data for chart (keep last 20 points for readability)
+                    const recentData = data.data.slice(-20);
+                    const timestamps = recentData.map(d => {
+                        const date = new Date(d.timestamp);
+                        return date.toLocaleTimeString();
+                    });
+                    
+                    // Calculate times (in seconds) - estimate from distances if time_saved is available
+                    const chosenTimes = [];
+                    const alternativeTimes = [];
+                    const timeSaved = [];
+                    
+                    recentData.forEach(d => {
+                        // If we have time_saved, we can estimate times
+                        if (d.time_saved_seconds !== null && d.time_saved_seconds !== undefined) {
+                            // Estimate alternative time from saved time and efficiency
+                            if (d.path_efficiency_ratio && d.path_efficiency_ratio > 0) {
+                                const altTime = d.time_saved_seconds / (1 - 1/d.path_efficiency_ratio);
+                                const chosenTime = altTime / d.path_efficiency_ratio;
+                                chosenTimes.push(chosenTime);
+                                alternativeTimes.push(altTime);
+                                timeSaved.push(d.time_saved_seconds);
+                            } else {
+                                // Fallback: use distances if available
+                                const speed = 2.5; // Average speed in m/s
+                                const chosenTime = d.chosen_path_distance_meters ? d.chosen_path_distance_meters / speed : 0;
+                                const altTime = d.alternative_path_distance_meters ? d.alternative_path_distance_meters / speed : 0;
+                                chosenTimes.push(chosenTime);
+                                alternativeTimes.push(altTime);
+                                timeSaved.push(Math.max(0, altTime - chosenTime));
+                            }
+                        } else if (d.chosen_path_distance_meters && d.alternative_path_distance_meters) {
+                            // Use distances to estimate times
+                            const speed = 2.5; // Average speed in m/s
+                            const chosenTime = d.chosen_path_distance_meters / speed;
+                            const altTime = d.alternative_path_distance_meters / speed;
+                            chosenTimes.push(chosenTime);
+                            alternativeTimes.push(altTime);
+                            timeSaved.push(Math.max(0, altTime - chosenTime));
+                        } else {
+                            chosenTimes.push(0);
+                            alternativeTimes.push(0);
+                            timeSaved.push(0);
+                        }
+                    });
+                    
+                    // Create or update chart
+                    const comparisonCtx = document.getElementById('pathComparisonChart');
+                    if (!pathComparisonChart) {
+                        pathComparisonChart = new Chart(comparisonCtx, {
+                            type: 'line',
+                            data: {
+                                labels: timestamps,
+                                datasets: [
+                                    {
+                                        label: 'Chosen Path (RRT) Time (s)',
+                                        data: chosenTimes,
+                                        borderColor: '#4CAF50',
+                                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                        fill: true,
+                                        tension: 0.4,
+                                        pointRadius: 2,
+                                        pointHoverRadius: 5
+                                    },
+                                    {
+                                        label: 'Next Quickest Path Time (s)',
+                                        data: alternativeTimes,
+                                        borderColor: '#FF9800',
+                                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                                        borderDash: [5, 5],
+                                        fill: false,
+                                        tension: 0.4,
+                                        pointRadius: 2,
+                                        pointHoverRadius: 5
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'top'
+                                    },
+                                    tooltip: {
+                                        mode: 'index',
+                                        intersect: false,
+                                        callbacks: {
+                                            afterLabel: function(context) {
+                                                const index = context.dataIndex;
+                                                const saved = timeSaved[index];
+                                                return saved > 0 ? `Time saved: ${saved.toFixed(2)}s` : '';
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: {
+                                            display: true,
+                                            text: 'Time (seconds)'
+                                        }
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Time'
+                                        },
+                                        ticks: {
+                                            maxRotation: 45,
+                                            minRotation: 45
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        pathComparisonChart.data.labels = timestamps;
+                        pathComparisonChart.data.datasets[0].data = chosenTimes;
+                        pathComparisonChart.data.datasets[1].data = alternativeTimes;
+                        pathComparisonChart.update('none');
+                    }
+                } else {
+                    // No data - initialize empty chart if it doesn't exist
+                    const comparisonCtx = document.getElementById('pathComparisonChart');
+                    if (!pathComparisonChart && comparisonCtx) {
+                        pathComparisonChart = new Chart(comparisonCtx, {
+                            type: 'line',
+                            data: {
+                                labels: [],
+                                datasets: [
+                                    {
+                                        label: 'Chosen Path (RRT) Time (s)',
+                                        data: [],
+                                        borderColor: '#4CAF50',
+                                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                        fill: true,
+                                        tension: 0.4,
+                                        pointRadius: 2,
+                                        pointHoverRadius: 5
+                                    },
+                                    {
+                                        label: 'Next Quickest Path Time (s)',
+                                        data: [],
+                                        borderColor: '#FF9800',
+                                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                                        borderDash: [5, 5],
+                                        fill: false,
+                                        tension: 0.4,
+                                        pointRadius: 2,
+                                        pointHoverRadius: 5
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'top'
+                                    },
+                                    tooltip: {
+                                        mode: 'index',
+                                        intersect: false
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        title: {
+                                            display: true,
+                                            text: 'Time (seconds)'
+                                        }
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Time'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Path efficiency update error:', error);
+            }
+        }
+        
+        async function showPathForRequest(requestId) {
+            try {
+                const response = await fetch(`${API_BASE}/request/${requestId}`);
+                const req = await response.json();
+                
+                // Get route from request if available
+                let route = req.route || null;
+                let startLocId = null;
+                let endLocId = req.requester_location_id;
+                
+                if (route && route.length >= 2) {
+                    // Use actual route from request
+                    startLocId = route[0];
+                    endLocId = route[route.length - 1];
+                } else {
+                    // Fallback: try to get start location from drone
+                    if (req.assigned_drone_id) {
+                        try {
+                            const droneResponse = await fetch(`${API_BASE}/drone/${req.assigned_drone_id}`);
+                            const drone = await droneResponse.json();
+                            startLocId = drone.current_location_id;
+                        } catch (e) {
+                            console.error('Error fetching drone:', e);
+                        }
+                    }
+                    
+                    // If we couldn't get start location, use a default nearby location for visualization
+                    if (!startLocId || startLocId === endLocId) {
+                        startLocId = endLocId > 1 ? endLocId - 1 : 1;
+                    }
+                }
+                
+                visualizePath(requestId, startLocId, endLocId, req.path_efficiency);
+            } catch (error) {
+                console.error('Error loading request for path visualization:', error);
+                showNotification('Could not load path data', 'error');
+            }
+        }
+        
+        async function visualizePath(requestId, startLocId, endLocId, pathEfficiencyData) {
+            const visualization = document.getElementById('pathVisualization');
+            
+            // Fetch graph structure to show actual layout
+            let graphData = null;
+            try {
+                const graphResponse = await fetch(`${API_BASE}/graph/structure`);
+                if (graphResponse.ok) {
+                    graphData = await graphResponse.json();
+                }
+            } catch (e) {
+                console.error('Error fetching graph structure:', e);
+            }
+            
+            // Get location coordinates (use graph data if available, otherwise fallback to window.LOCATION_TO_COORDS)
+            let locationMap = {};
+            let bounds = null;
+            if (graphData && graphData.locations) {
+                bounds = graphData.bounds;
+                // Scale coordinates for visualization (from meters to SVG coordinates)
+                const svgWidth = 1000;
+                const svgHeight = 600;
+                const padding = 40;
+                const scaleX = (svgWidth - 2 * padding) / Math.max(bounds.x_max - bounds.x_min, 1);
+                const scaleY = (svgHeight - 2 * padding) / Math.max(bounds.y_max - bounds.y_min, 1);
+                const scale = Math.min(scaleX, scaleY);
+                
+                for (const loc of graphData.locations) {
+                    locationMap[loc.id] = {
+                        x: (loc.x - bounds.x_min) * scale + padding,
+                        y: (loc.y - bounds.y_min) * scale + padding,
+                        name: loc.name
+                    };
+                }
+            } else if (window.LOCATION_TO_COORDS) {
+                locationMap = window.LOCATION_TO_COORDS;
+            }
+            
+            const startLoc = locationMap[startLocId];
+            const endLoc = locationMap[endLocId];
+            
+            if (!startLoc || !endLoc) {
+                visualization.innerHTML = `
+                    <div style="text-align: center; color: #999;">
+                        <p>Path visualization requires location coordinates</p>
+                        <p style="font-size: 0.9em;">Start: ${startLocId}, End: ${endLocId}</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Create SVG visualization
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.setAttribute('viewBox', '0 0 1000 600');
+            svg.style.position = 'absolute';
+            svg.style.top = '0';
+            svg.style.left = '0';
+            
+            // Draw graph structure (pathways/hallways) if available
+            if (graphData && graphData.pathways) {
+                for (const pathway of graphData.pathways) {
+                    const fromLoc = locationMap[pathway.from_id];
+                    const toLoc = locationMap[pathway.to_id];
+                    if (fromLoc && toLoc) {
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', fromLoc.x);
+                        line.setAttribute('y1', fromLoc.y);
+                        line.setAttribute('x2', toLoc.x);
+                        line.setAttribute('y2', toLoc.y);
+                        line.setAttribute('stroke', '#ddd');
+                        line.setAttribute('stroke-width', '2');
+                        line.setAttribute('opacity', '0.4');
+                        svg.insertBefore(line, svg.firstChild); // Insert before other elements
+                    }
+                }
+            }
+            
+            // Draw graph nodes (locations) if available
+            if (graphData && graphData.locations) {
+                for (const loc of graphData.locations) {
+                    const locCoord = locationMap[loc.id];
+                    if (locCoord) {
+                        const nodeCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        nodeCircle.setAttribute('cx', locCoord.x);
+                        nodeCircle.setAttribute('cy', locCoord.y);
+                        nodeCircle.setAttribute('r', '4');
+                        nodeCircle.setAttribute('fill', '#999');
+                        nodeCircle.setAttribute('opacity', '0.5');
+                        svg.appendChild(nodeCircle);
+                    }
+                }
+            }
+            
+            // Draw alternative path (straight line - next quickest path)
+            const altLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            altLine.setAttribute('x1', startLoc.x);
+            altLine.setAttribute('y1', startLoc.y);
+            altLine.setAttribute('x2', endLoc.x);
+            altLine.setAttribute('y2', endLoc.y);
+            altLine.setAttribute('stroke', '#FF9800');
+            altLine.setAttribute('stroke-width', '3');
+            altLine.setAttribute('stroke-dasharray', '5,5');
+            altLine.setAttribute('opacity', '0.6');
+            svg.appendChild(altLine);
+            
+            // Draw chosen path (for now use a curved path, could be enhanced to use actual route)
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const midX = (startLoc.x + endLoc.x) / 2;
+            const midY = (startLoc.y + endLoc.y) / 2 - 30; // Curve upward
+            const d = `M ${startLoc.x} ${startLoc.y} Q ${midX} ${midY} ${endLoc.x} ${endLoc.y}`;
+            path.setAttribute('d', d);
+            path.setAttribute('stroke', '#4CAF50');
+            path.setAttribute('stroke-width', '4');
+            path.setAttribute('fill', 'none');
+            svg.appendChild(path);
+            
+            // Draw start point
+            const startCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            startCircle.setAttribute('cx', startLoc.x);
+            startCircle.setAttribute('cy', startLoc.y);
+            startCircle.setAttribute('r', '10');
+            startCircle.setAttribute('fill', '#2196F3');
+            startCircle.setAttribute('stroke', '#fff');
+            startCircle.setAttribute('stroke-width', '2');
+            svg.appendChild(startCircle);
+            
+            const startText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            startText.setAttribute('x', startLoc.x);
+            startText.setAttribute('y', startLoc.y - 15);
+            startText.setAttribute('text-anchor', 'middle');
+            startText.setAttribute('font-size', '12');
+            startText.setAttribute('font-weight', 'bold');
+            startText.setAttribute('fill', '#2196F3');
+            startText.textContent = 'Start';
+            svg.appendChild(startText);
+            
+            // Draw end point
+            const endCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            endCircle.setAttribute('cx', endLoc.x);
+            endCircle.setAttribute('cy', endLoc.y);
+            endCircle.setAttribute('r', '10');
+            endCircle.setAttribute('fill', '#f44336');
+            endCircle.setAttribute('stroke', '#fff');
+            endCircle.setAttribute('stroke-width', '2');
+            svg.appendChild(endCircle);
+            
+            const endText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            endText.setAttribute('x', endLoc.x);
+            endText.setAttribute('y', endLoc.y - 15);
+            endText.setAttribute('text-anchor', 'middle');
+            endText.setAttribute('font-size', '12');
+            endText.setAttribute('font-weight', 'bold');
+            endText.setAttribute('fill', '#f44336');
+            endText.textContent = 'End';
+            svg.appendChild(endText);
+            
+            // Add info text
+            const infoDiv = document.createElement('div');
+            infoDiv.style.cssText = 'position: absolute; bottom: 10px; left: 10px; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 4px; font-size: 0.85em;';
+            if (pathEfficiencyData) {
+                infoDiv.innerHTML = `
+                    <strong>Request #${requestId}</strong><br>
+                    ${pathEfficiencyData.time_saved_vs_alternative_seconds ? `Time Saved: ${pathEfficiencyData.time_saved_vs_alternative_seconds.toFixed(2)}s<br>` : ''}
+                    ${pathEfficiencyData.path_efficiency_percentage ? `Efficiency: ${pathEfficiencyData.path_efficiency_percentage.toFixed(2)}%` : ''}
+                `;
+            } else {
+                infoDiv.innerHTML = `<strong>Request #${requestId}</strong>`;
+            }
+            
+            visualization.innerHTML = '';
+            visualization.appendChild(svg);
+            visualization.appendChild(infoDiv);
+            selectedPathRequest = requestId;
+        }
+        
+        async function updateMultiDroneVisualization() {
+            try {
+                const visualization = document.getElementById('multiDroneVisualization');
+                if (!visualization) return;
+                
+                // Fetch graph structure and active drones in parallel
+                const [graphResponse, dronesResponse] = await Promise.all([
+                    fetch(`${API_BASE}/graph/structure`),
+                    fetch(`${API_BASE}/drones/all`)
+                ]);
+                
+                if (!graphResponse.ok || !dronesResponse.ok) {
+                    return;
+                }
+                
+                const graphData = await graphResponse.json();
+                const dronesData = await dronesResponse.json();
+                
+                // Calculate SVG coordinate scaling
+                const bounds = graphData.bounds;
+                const svgWidth = 1000;
+                const svgHeight = 500;
+                const padding = 40;
+                const scaleX = (svgWidth - 2 * padding) / Math.max(bounds.x_max - bounds.x_min, 1);
+                const scaleY = (svgHeight - 2 * padding) / Math.max(bounds.y_max - bounds.y_min, 1);
+                const scale = Math.min(scaleX, scaleY);
+                
+                // Create location map with scaled coordinates
+                const locationMap = {};
+                for (const loc of graphData.locations) {
+                    locationMap[loc.id] = {
+                        x: (loc.x - bounds.x_min) * scale + padding,
+                        y: (loc.y - bounds.y_min) * scale + padding,
+                        name: loc.name
+                    };
+                }
+                
+                // Create SVG
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', '100%');
+                svg.setAttribute('viewBox', '0 0 1000 500');
+                svg.style.position = 'absolute';
+                svg.style.top = '0';
+                svg.style.left = '0';
+                
+                // Draw pathways (hallways) - draw with 3 lanes
+                for (const pathway of graphData.pathways) {
+                    const fromLoc = locationMap[pathway.from_id];
+                    const toLoc = locationMap[pathway.to_id];
+                    if (!fromLoc || !toLoc) continue;
+                    
+                    // Calculate perpendicular direction for lane offsets
+                    const dx = toLoc.x - fromLoc.x;
+                    const dy = toLoc.y - fromLoc.y;
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const perpX = -dy / length;
+                    const perpY = dx / length;
+                    const laneWidth = 3; // 3m total width, 1m per lane
+                    
+                    // Draw 3 lanes (left, middle, right)
+                    const laneOffsets = [-laneWidth * scale / 3, 0, laneWidth * scale / 3];
+                    for (let laneIdx = 0; laneIdx < 3; laneIdx++) {
+                        const offset = laneOffsets[laneIdx];
+                        const laneLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        laneLine.setAttribute('x1', fromLoc.x + perpX * offset);
+                        laneLine.setAttribute('y1', fromLoc.y + perpY * offset);
+                        laneLine.setAttribute('x2', toLoc.x + perpX * offset);
+                        laneLine.setAttribute('y2', toLoc.y + perpY * offset);
+                        laneLine.setAttribute('stroke', laneIdx === 1 ? '#ccc' : '#e0e0e0'); // Middle lane slightly darker
+                        laneLine.setAttribute('stroke-width', '1.5');
+                        laneLine.setAttribute('opacity', '0.5');
+                        svg.appendChild(laneLine);
+                    }
+                }
+                
+                // Draw location nodes
+                for (const loc of graphData.locations) {
+                    const locCoord = locationMap[loc.id];
+                    if (!locCoord) continue;
+                    
+                    const nodeCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    nodeCircle.setAttribute('cx', locCoord.x);
+                    nodeCircle.setAttribute('cy', locCoord.y);
+                    nodeCircle.setAttribute('r', '6');
+                    nodeCircle.setAttribute('fill', '#4CAF50');
+                    nodeCircle.setAttribute('stroke', '#fff');
+                    nodeCircle.setAttribute('stroke-width', '2');
+                    svg.appendChild(nodeCircle);
+                    
+                    // Add location label
+                    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    label.setAttribute('x', locCoord.x);
+                    label.setAttribute('y', locCoord.y - 10);
+                    label.setAttribute('text-anchor', 'middle');
+                    label.setAttribute('font-size', '10');
+                    label.setAttribute('fill', '#666');
+                    label.textContent = loc.id;
+                    svg.appendChild(label);
+                }
+                
+                // Draw active drones with their routes
+                const activeDrones = (dronesData.drones || []).filter(d => 
+                    d.status === 'assigned' || d.status === 'in_transit'
+                );
+                
+                for (const drone of activeDrones) {
+                    const isEmergency = drone.emergency_drone;
+                    const priorityLevel = drone.request_info?.priority_value || 3;
+                    const isHighPriority = isEmergency || priorityLevel >= 4;
+                    const droneColor = isHighPriority ? '#f44336' : '#2196F3'; // Red for emergency, blue for normal
+                    
+                    // Get route
+                    const route = drone.delivery_route || [];
+                    if (route.length < 2) continue;
+                    
+                    // Draw drone path with lane assignment
+                    // Emergency/high priority: middle lane (lane 1, offset = 0)
+                    // Normal/low priority: left or right lane (lane 0 or 2, offset = ±laneWidth/3)
+                    let laneOffset = 0; // Default to middle
+                    if (!isHighPriority) {
+                        // Normal priority: alternate between left (0) and right (2) based on drone ID
+                        laneOffset = (drone.id % 2 === 0) ? -scale : scale; // Alternate lanes
+                    }
+                    
+                    // Draw path through route
+                    for (let i = 0; i < route.length - 1; i++) {
+                        const fromId = route[i];
+                        const toId = route[i + 1];
+                        const fromLoc = locationMap[fromId];
+                        const toLoc = locationMap[toId];
+                        if (!fromLoc || !toLoc) continue;
+                        
+                        // Calculate perpendicular offset for lane
+                        const dx = toLoc.x - fromLoc.x;
+                        const dy = toLoc.y - fromLoc.y;
+                        const length = Math.sqrt(dx * dx + dy * dy);
+                        if (length === 0) continue;
+                        const perpX = -dy / length;
+                        const perpY = dx / length;
+                        const laneWidthMeters = 3.0; // 3m total width
+                        const offset = laneOffset * (laneWidthMeters / 3.0) * scale / (bounds.x_max - bounds.x_min) * 10;
+                        
+                        const pathLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        pathLine.setAttribute('x1', fromLoc.x + perpX * offset);
+                        pathLine.setAttribute('y1', fromLoc.y + perpY * offset);
+                        pathLine.setAttribute('x2', toLoc.x + perpX * offset);
+                        pathLine.setAttribute('y2', toLoc.y + perpY * offset);
+                        pathLine.setAttribute('stroke', droneColor);
+                        pathLine.setAttribute('stroke-width', '3');
+                        pathLine.setAttribute('opacity', '0.8');
+                        svg.appendChild(pathLine);
+                    }
+                    
+                    // Draw drone icon at current position
+                    if (route.length > 0) {
+                        const currentLoc = locationMap[route[0]];
+                        if (currentLoc) {
+                            const droneCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                            droneCircle.setAttribute('cx', currentLoc.x);
+                            droneCircle.setAttribute('cy', currentLoc.y);
+                            droneCircle.setAttribute('r', '8');
+                            droneCircle.setAttribute('fill', droneColor);
+                            droneCircle.setAttribute('stroke', '#fff');
+                            droneCircle.setAttribute('stroke-width', '2');
+                            svg.appendChild(droneCircle);
+                        }
+                    }
+                }
+                
+                visualization.innerHTML = '';
+                visualization.appendChild(svg);
+            } catch (error) {
+                console.error('Multi-drone visualization error:', error);
             }
         }
 
@@ -2250,7 +3392,7 @@
                             📍 Location: ${req.requester_location_id}<br>
                             ${req.description ? req.description + '<br>' : ''}
                             ${req.is_partial_delivery && req.parent_request_id ? `<br><small style="color: #9C27B0;">📋 Part of split order (Parent: Request #${req.parent_request_id})</small>` : ''}
-                            ${req.payload_description && req.payload_weight_kg ? `<br><strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
+                            ${req.payload_description && req.payload_weight_kg ? `<br><strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 2.0} kg max</small>` : ''}
                             <small>Status: ${req.status.toUpperCase()} | Created: ${new Date(req.timestamp).toLocaleString()}</small>
                             ${req.assigned_drone_id ? `<br><small>✅ Assigned to Drone #${req.assigned_drone_id} - Will auto-complete when drone arrives</small>` : '<br><small>⏳ Waiting for assignment...</small>'}
                             ${req.vital_priority_score !== undefined ? `<br><small>📊 Vital Priority Score: ${req.vital_priority_score} (for tie-breaking within CTAS level)</small>` : ''}
@@ -2326,17 +3468,47 @@
                 const requestsHtml = completedRequests.map(req => {
                     const energy = req.energy;
                     return `
-                        <div class="request-item completed">
+                        <div class="request-item completed" onclick="showPathForRequest(${req.id})" style="cursor: pointer;">
                             <div class="request-header">
                                 <span class="request-title">Request #${req.id} - ${req.requester_name || req.requester_id}</span>
                                 <span class="priority-badge priority-${req.priority.toLowerCase().replace('_', '-')}">${formatCTASPriority(req.priority)}</span>
                             </div>
                             <div class="request-details">
                                 ${req.description ? `<strong>${req.description}</strong><br>` : '<em>(No description provided)</em><br>'}
-                                ${req.payload_description && req.payload_weight_kg ? `<br><strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 1.5} kg max</small>` : ''}
+                                ${req.payload_description && req.payload_weight_kg ? `<br><strong>Payload:</strong> ${req.payload_description} <br><small>Weight: ${req.payload_weight_kg.toFixed(3)} kg / ${req.max_payload_capacity_kg || 2.0} kg max</small>` : ''}
                                 <small>Location: ${req.requester_location_id} | Completed: ${new Date(req.timestamp).toLocaleString()}</small>
                                 ${req.assigned_drone_id ? `<br><small>Drone ID: ${req.assigned_drone_id}</small>` : ''}
                             </div>
+                            ${req.path_efficiency ? `
+                                <div class="energy-details" style="margin-top: 10px; padding: 10px; background: #f0f7ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+                                    <h4 style="margin-bottom: 8px; color: #2196F3;">Path Efficiency</h4>
+                                    <div style="font-size: 0.9em;">
+                                        <div style="margin: 5px 0;">
+                                            <strong>Time Saved:</strong> ${req.path_efficiency.time_saved_vs_alternative_seconds ? req.path_efficiency.time_saved_vs_alternative_seconds.toFixed(2) + ' s' : 'N/A'}
+                                        </div>
+                                        <div style="margin: 5px 0;">
+                                            <strong>Efficiency:</strong> ${req.path_efficiency.path_efficiency_percentage ? req.path_efficiency.path_efficiency_percentage.toFixed(2) + '%' : 'N/A'}
+                                        </div>
+                                        <div style="margin: 5px 0;">
+                                            <strong>Chosen Path:</strong> ${req.path_efficiency.chosen_path_distance_meters ? req.path_efficiency.chosen_path_distance_meters.toFixed(2) + ' m' : 'N/A'}
+                                        </div>
+                                        <div style="margin: 5px 0;">
+                                            <strong>Alternative Path:</strong> ${req.path_efficiency.alternative_path_distance_meters ? req.path_efficiency.alternative_path_distance_meters.toFixed(2) + ' m' : 'N/A'}
+                                        </div>
+                                        <button onclick="event.stopPropagation(); showPathForRequest(${req.id})" 
+                                                style="margin-top: 8px; padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">
+                                            View Path
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div style="margin-top: 10px;">
+                                    <button onclick="event.stopPropagation(); showPathForRequest(${req.id})" 
+                                            style="padding: 5px 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">
+                                        View Path
+                                    </button>
+                                </div>
+                            `}
                             ${energy ? `
                                 <div class="energy-details">
                                     <h4>Energy Savings Report</h4>
@@ -2400,7 +3572,7 @@
                                                     <span class="energy-value">${req.path_efficiency.chosen_path_distance_meters.toFixed(2)} m</span>
                                                 </div>
                                                 <div class="energy-item">
-                                                    <span>Alternative Path (Dijkstra):</span>
+                                                    <span>Next Quickest Path:</span>
                                                     <span class="energy-value">${req.path_efficiency.alternative_path_distance_meters.toFixed(2)} m</span>
                                                 </div>
                                                 <div class="energy-item">
@@ -2449,7 +3621,7 @@
             const payloadItems = getSelectedItems();
             const totalWeight = calculateTotalWeight();
             
-            // Note: Payloads > 1.5kg will be automatically split into multiple prioritized requests
+            // Note: Payloads > 2.0kg will be automatically split into multiple prioritized requests
             // Most critical items will be sent first with available drones
             // Remaining items will be queued until drones become available
             if (totalWeight > maxPayloadCapacity) {
@@ -2756,7 +3928,6 @@
     </script>
     
     <!-- Hospital Map Script -->
-    <script src="/map.js"></script>
     <script>
         // Connect map to backend API
         const API_BASE_MAP = API_BASE; // Use same API base
@@ -2968,21 +4139,10 @@
         let hospitalTracker = null;
         
         function initializeTracker() {
-            // Check if all required dependencies are loaded
-            if (typeof THREE === 'undefined') {
-                console.error('Three.js is not loaded');
-                return false;
-            }
-            
             // Check if HospitalDroneTracker class is loaded
             if (typeof HospitalDroneTracker === 'undefined') {
                 console.error('HospitalDroneTracker class is not loaded. map.js may not have loaded correctly.');
                 return false;
-            }
-            
-            // Check if OrbitControls is available
-            if (typeof THREE.OrbitControls === 'undefined' && typeof OrbitControls === 'undefined') {
-                console.warn('OrbitControls not found - map will work without camera controls');
             }
             
             try {
@@ -3016,13 +4176,6 @@
                 return;
             }
             
-            // Check if all required dependencies are loaded
-            if (typeof THREE === 'undefined') {
-                console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for Three.js to load...');
-                setTimeout(waitForDependencies, 100);
-                return;
-            }
-            
             // Check if HospitalDroneTracker class is loaded (map.js must be loaded)
             if (typeof HospitalDroneTracker === 'undefined') {
                 console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for map.js to load...');
@@ -3031,33 +4184,22 @@
             }
             
             // Check if DOM elements exist
-            const canvas = document.getElementById('three-canvas');
-            const container = document.getElementById('canvas-container');
             const floorSvg = document.getElementById('floor-svg');
+            const floorPlanContainer = document.getElementById('floor-plan-container');
             
-            if (!canvas || !container || !floorSvg) {
+            if (!floorSvg || !floorPlanContainer) {
                 console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for DOM elements...', {
-                    canvas: !!canvas,
-                    container: !!container,
-                    floorSvg: !!floorSvg
+                    floorSvg: !!floorSvg,
+                    floorPlanContainer: !!floorPlanContainer
                 });
                 setTimeout(waitForDependencies, 100);
                 return;
             }
             
-            // Check if container has dimensions - don't block if zero, let constructor handle it
-            const rect = container.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) {
-                console.log('Attempt', dependencyCheckAttempts + ':', 'Container has zero dimensions, but proceeding anyway...');
-                // Don't return - let the constructor handle dimension setting
-            }
-            
             console.log('All dependencies ready, initializing map...', {
-                THREE: typeof THREE !== 'undefined',
                 HospitalDroneTracker: typeof HospitalDroneTracker !== 'undefined',
-                canvas: !!canvas,
-                container: !!container,
-                containerSize: { width: rect.width, height: rect.height }
+                floorSvg: !!floorSvg,
+                container: !!container
             });
             
             const success = initializeTracker();
