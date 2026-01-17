@@ -1204,42 +1204,46 @@
             </div>
         </div>
 
-        <!-- Map and Request Form Side by Side -->
-        <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; align-items: start;">
-            <!-- Hospital Map Visualization -->
-            <div class="card" style="padding: 20px;">
-                <h2 style="margin: 0 0 15px 0;">Hospital Map & Drone Tracker</h2>
-                
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button onclick="switchFloorMap(1)" id="btn-floor1" style="padding: 10px 20px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Floor 1</button>
-                    <button onclick="switchFloorMap(2)" id="btn-floor2" style="padding: 10px 20px; background-color: #95a5a6; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">Floor 2</button>
+        <div class="map-request-grid">
+            <div id="drone-tracker-container">
+                <div class="tracker-header">
+                    <h1 class="tracker-title">Hospital Drone Location</h1>
+                    <div class="tracker-controls" id="tracker-controls">
+                        <!-- Buttons will be dynamically added here -->
+                    </div>
                 </div>
-                
-                <div style="background: white; border: 2px solid #ddd; border-radius: 5px; padding: 20px; min-height: 500px; text-align: center;">
-                    <img id="img-floor" src="/image.png" alt="Floor Plan" style="max-width: 100%; height: auto;">
+
+                <div class="tracker-content">
+                    <!-- 3D View Canvas -->
+                    <div id="canvas-container" class="canvas-container">
+                        <canvas id="three-canvas"></canvas>
+                        <div class="instruction">Click on a floor to view detailed layout and locations</div>
+                    </div>
+
+                    <!-- 2D Floor Plans -->
+                    <div id="floor-plan-container" class="floor-plan-container" style="display: none;">
+                        <div class="floor-plan">
+                            <h2 id="floor-title" class="floor-title"></h2>
+                            <svg id="floor-svg" width="1000" height="600" class="floor-svg">
+                                <!-- Floor plan will be dynamically generated here -->
+                            </svg>
+                        </div>
+                    </div>
                 </div>
-                
-                <script>
-                    function switchFloorMap(floor) {
-                        const img = document.getElementById('img-floor');
-                        const btn1 = document.getElementById('btn-floor1');
-                        const btn2 = document.getElementById('btn-floor2');
-                        
-                        if (floor === 1) {
-                            img.src = '/image.png';
-                            btn1.style.backgroundColor = '#3498db';
-                            btn2.style.backgroundColor = '#95a5a6';
-                        } else {
-                            img.src = '/image2.png';
-                            btn1.style.backgroundColor = '#95a5a6';
-                            btn2.style.backgroundColor = '#3498db';
-                        }
-                    }
-                </script>
+
+                <!-- Drone Info Panel -->
+                <div id="drone-info" class="drone-info" style="display: none;">
+                    <button class="close-button" id="close-drone-info">×</button>
+                    <h3 class="drone-info-title" id="drone-name"></h3>
+                    <p><strong>ID:</strong> <span id="drone-id"></span></p>
+                    <p><strong>Floor:</strong> <span id="drone-floor"></span></p>
+                    <p><strong>Status:</strong> <span id="drone-status"></span></p>
+                    <p><strong>Position:</strong> <span id="drone-position"></span></p>
+                </div>
             </div>
 
             <!-- Create Request Form -->
-            <div class="card" style="display: flex; flex-direction: column; overflow-y: auto; height: 650px; min-height: 650px; max-height: 650px;">
+            <div class="card request-card" style="display: flex; flex-direction: column; overflow-y: auto;">
                 <h2> Create New Request</h2>
                 <form id="requestForm" class="request-form">
                     <div class="form-group">
@@ -1586,6 +1590,7 @@
 
     </div>
 
+    <script src="/map.js"></script>
     <script>
         const API_BASE = 'http://localhost:5001/api';
         let autoRefreshInterval = null;
@@ -3977,7 +3982,10 @@
         // Override the fetchDroneDataFromBackend method in HospitalDroneTracker
         HospitalDroneTracker.prototype.fetchDroneDataFromBackend = async function() {
             try {
-                const response = await fetch(`${API_BASE_MAP}/api/drones/all`);
+                if (!this.droneFlights) {
+                    this.droneFlights = {};
+                }
+                const response = await fetch(`${API_BASE_MAP}/drones/all`);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 
@@ -4151,6 +4159,7 @@
                     console.error('Failed to create HospitalDroneTracker instance - constructor returned null/undefined');
                     return false;
                 }
+                window.hospitalTracker = hospitalTracker;
                 console.log('Hospital Drone Tracker initialized successfully');
                 return true;
             } catch (error) {
@@ -4186,6 +4195,7 @@
             // Check if DOM elements exist
             const floorSvg = document.getElementById('floor-svg');
             const floorPlanContainer = document.getElementById('floor-plan-container');
+            const container = document.getElementById('canvas-container');
             
             if (!floorSvg || !floorPlanContainer) {
                 console.log('Attempt', dependencyCheckAttempts + ':', 'Waiting for DOM elements...', {

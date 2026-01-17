@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Drone System</title>
+    <link rel="stylesheet" href="map.css">
+    <link rel="stylesheet" href="alerts.css">
+
+</head>
+<body>
+     <header>
+        <h1>Drone Navigation System</h1>
+        <nav>...</nav>
+    </header>
+    
+    <section>
+        <h2>ALERTS</h2>
+        <p>Some content here...</p>
+    </section>
+
+    <div id="drone-tracker-container">
+        <div class="tracker-header">
+            <h1 class="tracker-title">Hospital Drone Location</h1>
+            <div class="tracker-controls" id="tracker-controls">
+                <!-- Buttons will be dynamically added here -->
+            </div>
+        </div>
+
+        <div class="tracker-content">
+            <!-- 3D View Canvas -->
+            <div id="canvas-container" class="canvas-container">
+                <canvas id="three-canvas"></canvas>
+                <div class="instruction">Click on a floor to view detailed layout and locations</div>
+            </div>
+
+            <!-- 2D Floor Plans -->
+            <div id="floor-plan-container" class="floor-plan-container" style="display: none;">
+                <div class="floor-plan">
+                    <h2 id="floor-title" class="floor-title"></h2>
+                    <svg id="floor-svg" width="1000" height="600" class="floor-svg">
+                        <!-- Floor plan will be dynamically generated here -->
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drone Info Panel -->
+        <div id="drone-info" class="drone-info" style="display: none;">
+            <button class="close-button" id="close-drone-info">×</button>
+            <h3 class="drone-info-title" id="drone-name"></h3>
+            <p><strong>ID:</strong> <span id="drone-id"></span></p>
+            <p><strong>Floor:</strong> <span id="drone-floor"></span></p>
+            <p><strong>Status:</strong> <span id="drone-status"></span></p>
+            <p><strong>Position:</strong> <span id="drone-position"></span></p>
+        </div>
+    </div>
+
+    <!-- Load Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script src="map.js"></script>
+    <script src="alerts.js"></script>
+
+</body>
+
+<script>
+  Alerts.init();
+</script>
+
+</html>

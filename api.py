@@ -90,14 +90,16 @@ def serve_map_js():
     """Serve the map.js file"""
     from flask import send_from_directory
     import os
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'map.js', mimetype='application/javascript')
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(os.path.join(root_dir, 'map'), 'map.js', mimetype='application/javascript')
 
 @app.route('/map.css')
 def serve_map_css():
     """Serve the map.css file"""
     from flask import send_from_directory
     import os
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'map.css', mimetype='text/css')
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(os.path.join(root_dir, 'map'), 'map.css', mimetype='text/css')
 
 @app.route('/image.png')
 def serve_image_png():
