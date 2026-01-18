@@ -387,7 +387,7 @@ Potential improvements for production use:
 
 ## License
 
-This project is created for the UTEK 2026 Programming Competition.
+This project is created for the UTEK 2026 Programming Competition. 
 
 ## Authors
 
